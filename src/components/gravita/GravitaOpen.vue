@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, ref, watch, Ref, nextTick} from 'vue'
 import { GravitaCollateralInfo, useCoreStore } from '../../store/core'
+import { Action, useActionStore } from '../../store/action'
 import { standardiseDecimals } from '../../utils/bn'
 import { watchPausable } from '@vueuse/core'
 
 const core = useCoreStore()
+const actionStore = useActionStore()
 
 const activeCollaterals = computed(() => core.gravitaCollateralInfo?.filter(x => x.isActive) || [])
 
@@ -13,8 +15,18 @@ const collateralAmount = ref(0)
 const debtAmount = ref(0)
 const debtRange = ref(0)
 
+const availableDebt = computed(() => {
+    if (!selectedCollateral.value) return 0
+    return standardiseDecimals(Number(selectedCollateral.value.mintCap) - Number(selectedCollateral.value.totalAssetDebt), selectedCollateral.value.decimals)
+})
+
 const collateralValue = computed(() => {
     if (!selectedCollateral.value) return 0
+    if (selectedCollateral.value.isPriceEthIndexed) {
+        const ethCollateral = activeCollaterals.value.find(x => x.symbol === 'WETH');
+        if (!ethCollateral) return 0
+        return Number(collateralAmount.value) * standardiseDecimals(selectedCollateral.value.price, selectedCollateral.value.priceDecimals) * standardiseDecimals(ethCollateral.price, ethCollateral.priceDecimals)
+    }
     return Number(collateralAmount.value) * standardiseDecimals(selectedCollateral.value.price, selectedCollateral.value.priceDecimals)
 })
 
@@ -48,7 +60,8 @@ const error = computed(() => {
     if (!selectedCollateral.value) return null
     // TODO: Compare collateral value to balance held in action queue (e.g. from flash loan)
     if (collateralRatio.value < standardiseDecimals(selectedCollateral.value.minCollateralRatio, 16)) return `Loan to value too high (<${(1 / standardiseDecimals(selectedCollateral.value.minCollateralRatio, 20)).toFixed(0)}%)`
-    if (debtAmount.value < standardiseDecimals(selectedCollateral.value.minNetDebt, selectedCollateral.value.decimals)) return `Debt amount too low (${standardiseDecimals(selectedCollateral.value.minNetDebt, selectedCollateral.value.decimals)} GRAI)`
+    if (debtAmount.value < standardiseDecimals(selectedCollateral.value.minNetDebt, selectedCollateral.value.decimals)) return `Debt amount too low (>${standardiseDecimals(selectedCollateral.value.minNetDebt, selectedCollateral.value.decimals)} GRAI)`
+    if (debtAmount.value > availableDebt.value) return `Debt amount too high (<${availableDebt.value.toFixed(0)} GRAI)`
     return null
 })
 
@@ -60,6 +73,15 @@ watch(collateralAmount, () => {
 watch(activeCollaterals, () => {
     selectedCollateral.value = activeCollaterals.value[0]
 })
+
+const addAction = async () => {
+    if (!selectedCollateral.value) return
+    const { upperHint, lowerHint } = await core.calculateGravitaHints(selectedCollateral.value.address, collateralAmount.value, debtAmount.value)
+    actionStore.spliceAction({
+        name: 'GravitaOpen',
+        calldata: [selectedCollateral.value.address, collateralAmount.value, debtAmount.value, upperHint, lowerHint],
+    }, actionStore.getActions.length)
+}
 </script>
 
 <template>
@@ -79,7 +101,7 @@ watch(activeCollaterals, () => {
                 <span class="label-text-alt cursor-pointer" @click="collateralAmount = standardiseDecimals(selectedCollateral?.balanceOf, selectedCollateral?.decimals || 18)">Available: {{ standardiseDecimals(selectedCollateral?.balanceOf, selectedCollateral?.decimals || 18).toFixed(2) }} {{ selectedCollateral?.symbol }}</span>
             </label>
             <div class="join">
-                <input class="input input-bordered join-item w-full" :class="{error: 'input-error'}" v-model="debtAmount"/>
+                <input class="input input-bordered join-item w-full" :class="{'input-error': error}" v-model="debtAmount"/>
                 <input class="input input-bordered join-item w-[80px]" disabled value="GRAI" />
             </div>
             <input type="range" min="0" max="100" class="range range-primary range-sm" v-model="debtRange" />
@@ -90,7 +112,7 @@ watch(activeCollaterals, () => {
             {{ collateralRatio.toFixed(0) }}% CR /
             {{ loanToValue.toFixed(0) }}% LTV
             <div class="card-actions justify-end">
-                <button class="btn btn-primary" :disabled="error !== null">Add Action</button>
+                <button class="btn btn-primary" :disabled="error !== null" @click="addAction">Add Action</button>
             </div>
         </div>
     </div>

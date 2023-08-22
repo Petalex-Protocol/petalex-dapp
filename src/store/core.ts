@@ -1,9 +1,8 @@
 import { defineStore } from "pinia"
-import { readContract, erc20ABI, multicall, account } from '@kolirt/vue-web3-auth'
+import { erc20ABI, multicall, account } from '@kolirt/vue-web3-auth'
 import adminAbi from '../abi/gravita/admin.json'
 import priceFeedAbi from '../abi/gravita/pricefeed.json'
 import oracleAbi from '../abi/gravita/oracle.json'
-import { info } from "console"
 
 export enum Network {
     goerli = "goerli",
@@ -16,6 +15,8 @@ export enum Address {
     petalexNft = "petalexNft",
     actioneExecutor = "actioneExecutor",
     gravitaAdmin = "gravitaAdmin",
+    gravitaVesselManagerOperations = "gravitaVesselManagerOperations",
+    gravitaSortedVessels = "gravitaSortedVessels",
 }
 
 export interface AddressMap {
@@ -68,6 +69,14 @@ export const useCoreStore = defineStore({
                             name: Address.gravitaAdmin,
                             address: "0xfE4d1A4616Db87a669B9A5eA9E9092cb0cA36511",
                         },
+                        {
+                            name: Address.gravitaVesselManagerOperations,
+                            address: "0x0",
+                        },
+                        {
+                            name: Address.gravitaSortedVessels,
+                            address: "0x0",
+                        },
                     ],
                 },
                 {
@@ -80,6 +89,35 @@ export const useCoreStore = defineStore({
                         {
                             name: Address.gravitaAdmin,
                             address: "0xf7Cc67326F9A1D057c1e4b110eF6c680B13a1f53",
+                        },
+                        {
+                            name: Address.gravitaVesselManagerOperations,
+                            address: "0x0",
+                        },
+                        {
+                            name: Address.gravitaSortedVessels,
+                            address: "0x0",
+                        },
+                    ],
+                },
+                {
+                    network: Network.arbitrum,
+                    addresses: [
+                        {
+                            name: Address.petalexNft,
+                            address: "0x0",
+                        },
+                        {
+                            name: Address.gravitaAdmin,
+                            address: "0x4928c8F8c20A1E3C295DddBe05095A9aBBdB3d14",
+                        },
+                        {
+                            name: Address.gravitaVesselManagerOperations,
+                            address: "0x0",
+                        },
+                        {
+                            name: Address.gravitaSortedVessels,
+                            address: "0x0",
                         },
                     ],
                 },
@@ -99,10 +137,11 @@ export const useCoreStore = defineStore({
         setCurrentNetwork(network: Network) {         
             this.connectedNetwork = network
         },
-        async getCollateralInfo() {
+        async getGravitaCollateralInfo() {
+            this.gravitaCollateralInfo = []
             const address = this.getAddress(Address.gravitaAdmin)
             if (!address || !account.connected) {
-                this.gravitaCollateralInfo = []
+                return
             }
 
             // First get all valid collaterals for querying and price feed address
@@ -210,8 +249,9 @@ export const useCoreStore = defineStore({
             for (const r of result) {
                 const data = r as any
                 const info = infos[i]
-                if (data.status === 'success') {
-                    if (adminCalls) {
+                
+                if (adminCalls) {
+                    if (data.status === 'success') {
                         switch (j) {    
                             case 1:
                                 info.mintCap = data.result.toString()
@@ -232,7 +272,11 @@ export const useCoreStore = defineStore({
                                 info.recoveryCollateralRadio = data.result.toString()
                                 break
                         }
-                    } else if (processingCollateralCalls) {
+                    } else {
+                        throw new Error(`Error getting admin info: ${data}`)
+                    }
+                } else if (processingCollateralCalls) {
+                    if (data.status === 'success') {
                         switch (j) {
                             case 1:
                                 info.name = data.result.toString()
@@ -248,6 +292,10 @@ export const useCoreStore = defineStore({
                                 break
                         }
                     } else {
+                        throw new Error(`Error getting collateral info: ${data}`)
+                    }
+                } else {
+                    if (data.status === 'success') {
                         const oracleResult = data.result as Array<any>
                         // 0 = price feed address, 1 = provider type, 2 = timeout (seconds), 3 = decimals, 4 = is eth indexed
                         switch (j) {
@@ -257,9 +305,9 @@ export const useCoreStore = defineStore({
                                 info.isPriceEthIndexed = oracleResult[4]
                                 break
                         }
+                    } else {
+                        // no price feed for this collateral so don't throw as it might just be inactive
                     }
-                } else {
-                    throw new Error(`Error getting collateral info: ${data}`)
                 }
                 if ((adminCalls && (j % adminMod === 0)) || (processingCollateralCalls && (j % ercMod === 0)) || (processingPriceFeedCalls && (j % priceFeedMod === 0))) {
                     ++i
@@ -281,7 +329,7 @@ export const useCoreStore = defineStore({
 
             // Get the price for each collateral
             const priceResult = await multicall({
-                calls: infos.map(x => ({
+                calls: infos.filter(x => x.priceFeed).map(x => ({
                         abi: oracleAbi,
                         contractAddress: x.priceFeed as `0x${string}`,
                         calls: [                            
@@ -293,6 +341,9 @@ export const useCoreStore = defineStore({
             i = 0
             for (const r of priceResult) {
                 const data = r as any
+                while (infos[i].priceFeed === '') {
+                    ++i
+                }
                 const info = infos[i]
                 if (data.status === 'success') {
                     const oracleResult = data.result as Array<any>
@@ -306,5 +357,9 @@ export const useCoreStore = defineStore({
 
             this.gravitaCollateralInfo = infos
         },
+        async calculateGravitaHints(address, coll, debt) {
+            // TODO: implement
+            return { upperHint: '0x0', lowerHint: '0x0' }
+        }
     },
 })
