@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch, Ref, nextTick} from 'vue'
 import { GravitaCollateralInfo, useCoreStore } from '../../store/core'
-import { Action, useActionStore } from '../../store/action'
+import { useActionStore } from '../../store/action'
 import { standardiseDecimals } from '../../utils/bn'
 import { watchPausable } from '@vueuse/core'
 
@@ -14,6 +14,7 @@ const selectedCollateral: Ref<GravitaCollateralInfo | null> = ref(null)
 const collateralAmount = ref(0)
 const debtAmount = ref(0)
 const debtRange = ref(0)
+const loading = ref(false)
 
 const availableDebt = computed(() => {
     if (!selectedCollateral.value) return 0
@@ -76,11 +77,16 @@ watch(activeCollaterals, () => {
 
 const addAction = async () => {
     if (!selectedCollateral.value) return
-    const { upperHint, lowerHint } = await core.calculateGravitaHints(selectedCollateral.value.address, collateralAmount.value, debtAmount.value)
-    actionStore.spliceAction({
-        name: 'GravitaOpen',
-        calldata: [selectedCollateral.value.address, collateralAmount.value, debtAmount.value, upperHint, lowerHint],
-    }, actionStore.getActions.length)
+    loading.value = true
+    try {
+        const { upperHint, lowerHint } = await core.calculateGravitaHints(selectedCollateral.value.address, collateralAmount.value, debtAmount.value)
+        actionStore.spliceAction({
+            name: 'GravitaOpen',
+            calldata: [selectedCollateral.value.address, collateralAmount.value, debtAmount.value, upperHint, lowerHint],
+        }, actionStore.getActions.length)
+    } finally {
+        loading.value = false
+    }
 }
 </script>
 
@@ -112,7 +118,7 @@ const addAction = async () => {
             {{ collateralRatio.toFixed(0) }}% CR /
             {{ loanToValue.toFixed(0) }}% LTV
             <div class="card-actions justify-end">
-                <button class="btn btn-primary" :disabled="error !== null" @click="addAction">Add Action</button>
+                <button class="btn btn-primary" :disabled="error !== null || loading" @click="addAction">Add Action <span v-if="loading" class="loading loading-spinner"></span></button>
             </div>
         </div>
     </div>

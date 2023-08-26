@@ -1,8 +1,11 @@
 import { defineStore } from "pinia"
-import { erc20ABI, multicall, account } from '@kolirt/vue-web3-auth'
+import { erc20ABI, multicall, account, readContract } from '@kolirt/vue-web3-auth'
 import adminAbi from '../abi/gravita/admin.json'
 import priceFeedAbi from '../abi/gravita/pricefeed.json'
+import vesselManagerOperationsAbi from '../abi/gravita/vesselmanageroperations.json'
+import sortedVesselsAbi from '../abi/gravita/sortedVessels.json'
 import oracleAbi from '../abi/gravita/oracle.json'
+import { getRandomInt } from "../utils/math"
 
 export enum Network {
     goerli = "goerli",
@@ -71,11 +74,11 @@ export const useCoreStore = defineStore({
                         },
                         {
                             name: Address.gravitaVesselManagerOperations,
-                            address: "0x0",
+                            address: "0x6001E43a15c3c253960eB17ae062AC5F5436fe25",
                         },
                         {
                             name: Address.gravitaSortedVessels,
-                            address: "0x0",
+                            address: "0x652dbFCBcB0d3A2EA1DF9402085cd9E5b94D6E6D",
                         },
                     ],
                 },
@@ -92,11 +95,11 @@ export const useCoreStore = defineStore({
                         },
                         {
                             name: Address.gravitaVesselManagerOperations,
-                            address: "0x0",
+                            address: "0xc49B737fa56f9142974a54F6C66055468eC631d0",
                         },
                         {
                             name: Address.gravitaSortedVessels,
-                            address: "0x0",
+                            address: "0xF31D88232F36098096d1eB69f0de48B53a1d18Ce",
                         },
                     ],
                 },
@@ -113,11 +116,11 @@ export const useCoreStore = defineStore({
                         },
                         {
                             name: Address.gravitaVesselManagerOperations,
-                            address: "0x0",
+                            address: "0x15f74458aE0bFdAA1a96CA1aa779D715Cc1Eefe4",
                         },
                         {
                             name: Address.gravitaSortedVessels,
-                            address: "0x0",
+                            address: "0xc49B737fa56f9142974a54F6C66055468eC631d0",
                         },
                     ],
                 },
@@ -357,9 +360,51 @@ export const useCoreStore = defineStore({
 
             this.gravitaCollateralInfo = infos
         },
-        async calculateGravitaHints(address, coll, debt) {
-            // TODO: implement
-            return { upperHint: '0x0', lowerHint: '0x0' }
+        async calculateGravitaHints(collateralAddress: string, coll: number, debt: number) {
+            const sortedVesselsAddress = this.getAddress(Address.gravitaSortedVessels)
+            const vesselManagerOperationsAddress = this.getAddress(Address.gravitaVesselManagerOperations)
+            const result = await multicall({
+                calls: [
+                    {
+                        abi: sortedVesselsAbi,
+                        contractAddress: sortedVesselsAddress as `0x${string}`,
+                        calls: [
+                            ['getSize', [collateralAddress]],
+                        ],
+                    },
+                    {
+                        abi: vesselManagerOperationsAbi,
+                        contractAddress: vesselManagerOperationsAddress as `0x${string}`,
+                        calls: [
+                            ['computeNominalCR', [coll, debt]],
+                        ],
+                    },
+                ]
+            })
+
+            const sortedVesselsResult = result[0] as any
+            const vesselManagerOperationsResult = result[1] as any
+            if (sortedVesselsResult.status !== 'success' || vesselManagerOperationsResult.status !== 'success') {
+                console.error(result)
+                throw new Error(`Error getting sorted vessels info`)
+            }
+
+            const hintResult = await readContract({
+                address: vesselManagerOperationsAddress as `0x${string}`,
+                abi: vesselManagerOperationsAbi,
+                functionName: 'getApproxHint',
+                args: [collateralAddress, vesselManagerOperationsResult.result, sortedVesselsResult.result * BigInt(15), getRandomInt()],
+            })
+
+
+            const insertPositionResult = await readContract({
+                address: sortedVesselsAddress as `0x${string}`,
+                abi: sortedVesselsAbi,
+                functionName: 'findInsertPosition',
+                args: [collateralAddress, vesselManagerOperationsResult.result, hintResult[0], hintResult[0]],
+            })
+
+            return { upperHint: insertPositionResult[0], lowerHint: insertPositionResult[1] }
         }
     },
 })

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useCoreStore, Address } from '../../store/core'
 import NetworkUnsupported from '../common/NetworkUnsupported.vue'
 import { chain, account } from '@kolirt/vue-web3-auth'
@@ -11,18 +11,24 @@ const adminAddress = computed(() => core.getAddress(Address.gravitaAdmin))
 const activeCollaterals = computed(() => core.gravitaCollateralInfo?.filter(x => x.isActive) || [])
 const loading = ref(false)
 
-watch([chain, account], async () => {
-    try {
-        if (account.connected) {
-            loading.value = true
-            await core.getGravitaCollateralInfo()
+const init = async () => {
+    if (!loading.value) {
+        try {
+            if (account.connected) {
+                loading.value = true
+                await core.getGravitaCollateralInfo()
+            }
+        } catch (error) {
+            console.log(error)
+        } finally {
+            loading.value = false
         }
-    } catch (error) {
-        console.log(error)
-    } finally {
-        loading.value = false
     }
-})
+}
+
+watch([chain, account], init)
+
+onMounted(init)
 </script>
 
 <template>
