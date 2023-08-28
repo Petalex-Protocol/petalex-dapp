@@ -1,11 +1,15 @@
 <script setup lang="ts">
+import ActionsBase from './actions/ActionsBase.vue'
 </script>
 
 <template>
     <div class="drawer md:drawer-open">
         <input id="my-drawer-2" type="checkbox" class="drawer-toggle" />
         <div class="drawer-content">
-            <RouterView class="p-4" />
+            <div class="flex flex-col justify-between h-full">
+                <RouterView class="p-4" />
+                <ActionsBase />
+            </div>
             <label for="my-drawer-2" class="btn btn-circle btn-primary drawer-button xs:hidden fixed top-[50%] left-[-25px]">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 4.5l7.5 7.5-7.5 7.5m-6-15l7.5 7.5-7.5 7.5" />

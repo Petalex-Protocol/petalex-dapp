@@ -20,6 +20,7 @@ export enum Address {
     gravitaAdmin = "gravitaAdmin",
     gravitaVesselManagerOperations = "gravitaVesselManagerOperations",
     gravitaSortedVessels = "gravitaSortedVessels",
+    gravitaDebtToken = "gravitaDebtToken",
 }
 
 export interface AddressMap {
@@ -80,6 +81,10 @@ export const useCoreStore = defineStore({
                             name: Address.gravitaSortedVessels,
                             address: "0x652dbFCBcB0d3A2EA1DF9402085cd9E5b94D6E6D",
                         },
+                        {
+                            name: Address.gravitaDebtToken,
+                            address: "0xb0e99590cF3Ddfdc19e68F91f7fe0626790cDb53",
+                        },
                     ],
                 },
                 {
@@ -101,6 +106,10 @@ export const useCoreStore = defineStore({
                             name: Address.gravitaSortedVessels,
                             address: "0xF31D88232F36098096d1eB69f0de48B53a1d18Ce",
                         },
+                        {
+                            name: Address.gravitaDebtToken,
+                            address: "0x15f74458aE0bFdAA1a96CA1aa779D715Cc1Eefe4",
+                        },
                     ],
                 },
                 {
@@ -121,6 +130,10 @@ export const useCoreStore = defineStore({
                         {
                             name: Address.gravitaSortedVessels,
                             address: "0xc49B737fa56f9142974a54F6C66055468eC631d0",
+                        },
+                        {
+                            name: Address.gravitaDebtToken,
+                            address: "0x894134a25a5faC1c2C26F1d8fBf05111a3CB9487",
                         },
                     ],
                 },
@@ -405,6 +418,28 @@ export const useCoreStore = defineStore({
             })
 
             return { upperHint: insertPositionResult[0], lowerHint: insertPositionResult[1] }
+        },
+        async getBalances(addresses: string[]) {
+            if (!account.connected || addresses.length === 0) {
+                return []
+            }
+            const result = await multicall({
+                calls: [
+                    ...addresses.map((x: string) => ({
+                        abi: erc20ABI,
+                        contractAddress: x as `0x${string}`,
+                        calls: [
+                            ['balanceOf', [account.address]],
+                            ['decimals', []]
+                        ],
+                    })) as any[],
+                ]
+            })
+
+            if (result.some((x: any) => x.status !== 'success')) {
+                throw new Error(`Error getting balances`)
+            }
+            return result.map((x: any) => x.result.toString())
         }
     },
 })

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch, Ref, nextTick} from 'vue'
-import { GravitaCollateralInfo, useCoreStore } from '../../store/core'
+import { Address, GravitaCollateralInfo, useCoreStore } from '../../store/core'
 import { useActionStore } from '../../store/action'
-import { standardiseDecimals } from '../../utils/bn'
+import { standardiseDecimals, convertFromDecimals } from '../../utils/bn'
 import { watchPausable } from '@vueuse/core'
 
 const core = useCoreStore()
@@ -59,7 +59,6 @@ const { pause: pauseDebtRange, resume: resumeDebtRange } = watchPausable(debtRan
 
 const error = computed(() => {
     if (!selectedCollateral.value) return null
-    // TODO: Compare collateral value to balance held in action queue (e.g. from flash loan)
     if (collateralRatio.value < standardiseDecimals(selectedCollateral.value.minCollateralRatio, 16)) return `Loan to value too high (<${(1 / standardiseDecimals(selectedCollateral.value.minCollateralRatio, 20)).toFixed(0)}%)`
     if (debtAmount.value < standardiseDecimals(selectedCollateral.value.minNetDebt, selectedCollateral.value.decimals)) return `Debt amount too low (>${standardiseDecimals(selectedCollateral.value.minNetDebt, selectedCollateral.value.decimals)} GRAI)`
     if (debtAmount.value > availableDebt.value) return `Debt amount too high (<${availableDebt.value.toFixed(0)} GRAI)`
@@ -79,10 +78,23 @@ const addAction = async () => {
     if (!selectedCollateral.value) return
     loading.value = true
     try {
-        const { upperHint, lowerHint } = await core.calculateGravitaHints(selectedCollateral.value.address, collateralAmount.value, debtAmount.value)
+        const coll = convertFromDecimals(collateralAmount.value, selectedCollateral.value.decimals)
+        const debt = convertFromDecimals(debtAmount.value, 18)
+
+        const { upperHint, lowerHint } = await core.calculateGravitaHints(selectedCollateral.value.address, coll, debt)
         actionStore.spliceAction({
             name: 'GravitaOpen',
-            calldata: [selectedCollateral.value.address, collateralAmount.value, debtAmount.value, upperHint, lowerHint],
+            displayName: 'Open Vessel',
+            calldata: [selectedCollateral.value.address, coll, debt, upperHint, lowerHint],
+            balanceChanges: [{
+                symbol: selectedCollateral.value.symbol,
+                address: selectedCollateral.value.address,
+                amount: collateralAmount.value * -1,
+            }, {
+                symbol: 'GRAI',
+                address: core.getAddress(Address.gravitaDebtToken) as string,
+                amount: debtAmount.value,
+            }],
         }, actionStore.getActions.length)
     } finally {
         loading.value = false
@@ -115,8 +127,10 @@ const addAction = async () => {
                 <span class="label-text-alt"></span>
                 <span class="label-text-alt text-error">{{ error }}</span>
             </label>
-            {{ collateralRatio.toFixed(0) }}% CR /
-            {{ loanToValue.toFixed(0) }}% LTV
+            <div v-if="debtAmount > 0">
+                {{ collateralRatio.toFixed(0) }}% CR /
+                {{ loanToValue.toFixed(0) }}% LTV
+            </div>
             <div class="card-actions justify-end">
                 <button class="btn btn-primary" :disabled="error !== null || loading" @click="addAction">Add Action <span v-if="loading" class="loading loading-spinner"></span></button>
             </div>
