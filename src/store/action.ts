@@ -27,7 +27,7 @@ export const useActionStore = defineStore({
         getActions(state: ActionState) {
             return state.actions
         },
-        missingBalances(state: ActionState): BalanceChange[] {
+        getBalances(state: ActionState): BalanceChange[] {
             const balances: BalanceChange[] = []
             for (const action of state.actions) {
                 for (const balanceChange of action.balanceChanges) {
@@ -41,7 +41,7 @@ export const useActionStore = defineStore({
                     }
                 }
             }
-            return balances.filter(x => x.amount < 0)
+            return balances
         },
     },
     actions: {

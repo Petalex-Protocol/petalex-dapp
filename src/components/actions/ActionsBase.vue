@@ -36,7 +36,7 @@ const calculateBalances = async () => {
 watch(() => actions.actions.length, calculateBalances)
 
 const missingBalances = computed(() => {    
-    return actions.missingBalances.map(x => {
+    return actions.getBalances.filter(x => x.amount < 0).map(x => {
         const balance = balances.value.find(b => b.symbol === x.symbol)
         return {
             symbol: x.symbol,

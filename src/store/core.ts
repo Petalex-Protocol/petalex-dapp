@@ -6,6 +6,7 @@ import vesselManagerOperationsAbi from '../abi/gravita/vesselmanageroperations.j
 import sortedVesselsAbi from '../abi/gravita/sortedVessels.json'
 import oracleAbi from '../abi/gravita/oracle.json'
 import { getRandomInt } from "../utils/math"
+import { useActionStore } from "./action"
 
 export enum Network {
     goerli = "goerli",
@@ -37,6 +38,12 @@ export interface CoreState {
     addresses: AddressNetworkMap[]
     connectedNetwork: Network
     gravitaCollateralInfo: GravitaCollateralInfo[]
+    activeVessels: ActiveVessel[]
+}
+
+export interface ActiveVessel {
+    address: string
+    hasVessel: boolean
 }
 
 export interface GravitaCollateralInfo {
@@ -140,6 +147,7 @@ export const useCoreStore = defineStore({
             ],
             connectedNetwork: Network.goerli,
             gravitaCollateralInfo: [],
+            activeVessels: [],
         } as CoreState),
     getters: {
         getNetworkAddressMap: (state: CoreState): AddressMap[] | undefined => {
@@ -147,6 +155,17 @@ export const useCoreStore = defineStore({
         },
         getAddress: (state: CoreState) => {
             return (name: Address) => state.addresses.find(x => x.network == state.connectedNetwork)?.addresses.find(x => x.name == name)?.address;  
+        },
+        getAggregatedActiveVessels: (state: CoreState) => {
+            const actionStore = useActionStore()
+            const openedVessels = actionStore.actions?.filter(x => x.name === 'GravitaOpen') || []
+            return [
+                ...openedVessels.map(x => ({
+                    address: x.calldata[0],
+                    hasVessel: true
+                })),
+                ...state.activeVessels.filter(x => !openedVessels.find(y => y.calldata[0] === x.address))
+            ]
         },
     },
     actions: {
@@ -440,6 +459,10 @@ export const useCoreStore = defineStore({
                 throw new Error(`Error getting balances`)
             }
             return result.map((x: any) => x.result.toString())
-        }
+        },
+        async getActiveVessels() {
+            // TODO: get proxy address from petalex nft and query gravita vessel manager for all collaterals
+            this.activeVessels = this.gravitaCollateralInfo.map(x => ({ address: x.address, hasVessel: false } as ActiveVessel))
+        },
     },
 })

@@ -37,8 +37,8 @@ import ActionsBase from './actions/ActionsBase.vue'
                     </div>
                     <ul class="collapse-content"> 
                         <li><router-link to="/liquity/open">Open</router-link></li>
-                        <li><a>Adjust</a></li>
-                        <li><a>Close</a></li>
+                        <li><router-link to="/liquity/adjust">Adjust</router-link></li>
+                        <li><router-link to="/liquity/close">Close</router-link></li>
                     </ul>
                 </li>
                 <li class="collapse">
@@ -47,8 +47,8 @@ import ActionsBase from './actions/ActionsBase.vue'
                         Utilities
                     </div>
                     <ul class="collapse-content"> 
-                        <li><a>Flash Loan</a></li>
-                        <li><a>Exchange</a></li>
+                        <li><router-link to="/utilities/flash">Flash Loan</router-link></li>
+                        <li><router-link to="/utilities/exchange">Exchange</router-link></li>
                     </ul>
                 </li>
             </ul>
