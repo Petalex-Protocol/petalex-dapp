@@ -1,13 +1,15 @@
 import { defineStore } from "pinia"
-import { erc20ABI, multicall, account, readContract } from '@kolirt/vue-web3-auth'
+import { erc20ABI, multicall, account, readContract, chain } from '@kolirt/vue-web3-auth'
 import adminAbi from '../abi/gravita/admin.json'
 import priceFeedAbi from '../abi/gravita/pricefeed.json'
 import vesselManagerOperationsAbi from '../abi/gravita/vesselmanageroperations.json'
 import uniswapV3FactoryAbi from '../abi/uniswap/uniswapv3factory.json'
+import uniswapQuoterV2Abi from '../abi/uniswap/uniswapquoterv2.json'
 import sortedVesselsAbi from '../abi/gravita/sortedVessels.json'
 import oracleAbi from '../abi/gravita/oracle.json'
 import { getRandomInt } from "../utils/math"
 import { useActionStore } from "./action"
+import { Contract, JsonRpcProvider, solidityPacked } from "ethers"
 
 export enum Network {
     goerli = "goerli",
@@ -24,6 +26,7 @@ export enum Address {
     gravitaSortedVessels = "gravitaSortedVessels",
     gravitaDebtToken = "gravitaDebtToken",
     uniswapV3Factory = "uniswapV3Factory",
+    uniswapQuoterV2 = "uniswapQuoterV2",
 
     weth = "weth",
     dai = "dai",
@@ -111,6 +114,10 @@ export const useCoreStore = defineStore({
                             name: Address.uniswapV3Factory,
                             address: "0x1F98431c8aD98523631AE4a59f267346ea31F984",
                         },
+                        {
+                            name: Address.uniswapQuoterV2,
+                            address: "0x61fFE014bA17989E743c5F6cB21bF9697530B21e",
+                        },
                     ],
                 },
                 {
@@ -140,6 +147,10 @@ export const useCoreStore = defineStore({
                             name: Address.uniswapV3Factory,
                             address: "0x1F98431c8aD98523631AE4a59f267346ea31F984",
                         },
+                        {
+                            name: Address.uniswapQuoterV2,
+                            address: "0x61fFE014bA17989E743c5F6cB21bF9697530B21e",
+                        },
                     ],
                 },
                 {
@@ -168,6 +179,10 @@ export const useCoreStore = defineStore({
                         {
                             name: Address.uniswapV3Factory,
                             address: "0x1F98431c8aD98523631AE4a59f267346ea31F984",
+                        },
+                        {
+                            name: Address.uniswapQuoterV2,
+                            address: "0x61fFE014bA17989E743c5F6cB21bF9697530B21e",
                         },
                     ],
                 },
@@ -617,6 +632,12 @@ export const useCoreStore = defineStore({
 
                 this.availableTokens = tempAvailableTokens
             }
+        },
+        async getUniswapV3Quote(token0: Token, token1: Token, amount0: number) {
+            const provider = new JsonRpcProvider(chain.value.rpcUrls.default.http[0])
+            const c = new Contract(this.getAddress(Address.uniswapQuoterV2), uniswapQuoterV2Abi, provider) as any
+            const path = solidityPacked(['address', 'uint24', 'address'], [token0.address, 3000, token1.address])
+            return await c.quoteExactInput.staticCall(path, amount0.toString())
         },
     },
 })
