@@ -3,6 +3,7 @@ import { erc20ABI, multicall, account, readContract } from '@kolirt/vue-web3-aut
 import adminAbi from '../abi/gravita/admin.json'
 import priceFeedAbi from '../abi/gravita/pricefeed.json'
 import vesselManagerOperationsAbi from '../abi/gravita/vesselmanageroperations.json'
+import uniswapV3FactoryAbi from '../abi/uniswap/uniswapv3factory.json'
 import sortedVesselsAbi from '../abi/gravita/sortedVessels.json'
 import oracleAbi from '../abi/gravita/oracle.json'
 import { getRandomInt } from "../utils/math"
@@ -22,6 +23,15 @@ export enum Address {
     gravitaVesselManagerOperations = "gravitaVesselManagerOperations",
     gravitaSortedVessels = "gravitaSortedVessels",
     gravitaDebtToken = "gravitaDebtToken",
+    uniswapV3Factory = "uniswapV3Factory",
+
+    weth = "weth",
+    dai = "dai",
+    usdc = "usdc",
+    usdt = "usdt",
+    wbtc = "wbtc",
+    link = "link",
+    lusd = "lusd",
 }
 
 export interface AddressMap {
@@ -39,6 +49,8 @@ export interface CoreState {
     connectedNetwork: Network
     gravitaCollateralInfo: GravitaCollateralInfo[]
     activeVessels: ActiveVessel[]
+    availableTokens: Token[]
+    tokensToQuery: AddressNetworkMap[]
 }
 
 export interface ActiveVessel {
@@ -46,15 +58,11 @@ export interface ActiveVessel {
     hasVessel: boolean
 }
 
-export interface GravitaCollateralInfo {
+export interface GravitaCollateralInfo extends Token {
     mintCap: string
     minNetDebt: string
     totalAssetDebt: string
-    address: string
-    name: string
-    decimals: number
     balanceOf: string
-    symbol: string
     isActive: boolean
     minCollateralRatio: string
     recoveryCollateralRadio: string
@@ -62,6 +70,13 @@ export interface GravitaCollateralInfo {
     price: string
     priceDecimals: string
     isPriceEthIndexed: boolean
+}
+
+export interface Token {
+    address: string
+    name: string
+    symbol: string
+    decimals: number
 }
 
 export const useCoreStore = defineStore({
@@ -92,6 +107,10 @@ export const useCoreStore = defineStore({
                             name: Address.gravitaDebtToken,
                             address: "0xb0e99590cF3Ddfdc19e68F91f7fe0626790cDb53",
                         },
+                        {
+                            name: Address.uniswapV3Factory,
+                            address: "0x1F98431c8aD98523631AE4a59f267346ea31F984",
+                        },
                     ],
                 },
                 {
@@ -116,6 +135,10 @@ export const useCoreStore = defineStore({
                         {
                             name: Address.gravitaDebtToken,
                             address: "0x15f74458aE0bFdAA1a96CA1aa779D715Cc1Eefe4",
+                        },
+                        {
+                            name: Address.uniswapV3Factory,
+                            address: "0x1F98431c8aD98523631AE4a59f267346ea31F984",
                         },
                     ],
                 },
@@ -142,12 +165,98 @@ export const useCoreStore = defineStore({
                             name: Address.gravitaDebtToken,
                             address: "0x894134a25a5faC1c2C26F1d8fBf05111a3CB9487",
                         },
+                        {
+                            name: Address.uniswapV3Factory,
+                            address: "0x1F98431c8aD98523631AE4a59f267346ea31F984",
+                        },
                     ],
                 },
             ],
             connectedNetwork: Network.goerli,
             gravitaCollateralInfo: [],
             activeVessels: [],
+            availableTokens: [],
+            tokensToQuery: [
+                {
+                    network: Network.goerli,
+                    addresses: [
+                        {
+                            name: Address.weth,
+                            address: '',
+                        }
+                    ],
+                },
+                {
+                    network: Network.homestead,
+                    addresses: [
+                        {
+                            name: Address.weth,
+                            address: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
+                        },
+                        {
+                            name: Address.usdc,
+                            address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+                        },
+                        {
+                            name: Address.usdt,
+                            address: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
+                        },
+                        {
+                            name: Address.dai,
+                            address: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
+                        },
+                        {
+                            name: Address.gravitaDebtToken,
+                            address: '0x15f74458aE0bFdAA1a96CA1aa779D715Cc1Eefe4',
+                        },
+                        {
+                            name: Address.lusd,
+                            address: '0x5f98805A4E8be255a32880FDeC7F6728C6568bA0',
+                        },
+                        {
+                            name: Address.link,
+                            address: '0x514910771AF9Ca656af840dff83E8264EcF986CA',
+                        },
+                        {
+                            name: Address.wbtc,
+                            address: '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599',
+                        },
+                    ],
+                },
+                {
+                    network: Network.arbitrum,
+                    addresses: [
+                        {
+                            name: Address.weth,
+                            address: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1',
+                        },
+                        {
+                            name: Address.usdc,
+                            address: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
+                        },
+                        {
+                            name: Address.usdt,
+                            address: '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9',
+                        },
+                        {
+                            name: Address.dai,
+                            address: '0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1',
+                        },
+                        {
+                            name: Address.gravitaDebtToken,
+                            address: '0x894134a25a5faC1c2C26F1d8fBf05111a3CB9487',
+                        },
+                        {
+                            name: Address.lusd,
+                            address: '0x93b346b6BC2548dA6A1E7d98E9a421B42541425b',
+                        },
+                        {
+                            name: Address.link,
+                            address: '0xf97f4df75117a78c1A5a0DBb814Af92458539FB4',
+                        }
+                    ],
+                },
+            ],
         } as CoreState),
     getters: {
         getNetworkAddressMap: (state: CoreState): AddressMap[] | undefined => {
@@ -428,7 +537,6 @@ export const useCoreStore = defineStore({
                 args: [collateralAddress, vesselManagerOperationsResult.result, sortedVesselsResult.result * BigInt(15), getRandomInt()],
             })
 
-
             const insertPositionResult = await readContract({
                 address: sortedVesselsAddress as `0x${string}`,
                 abi: sortedVesselsAbi,
@@ -463,6 +571,52 @@ export const useCoreStore = defineStore({
         async getActiveVessels() {
             // TODO: get proxy address from petalex nft and query gravita vessel manager for all collaterals
             this.activeVessels = this.gravitaCollateralInfo.map(x => ({ address: x.address, hasVessel: false } as ActiveVessel))
+        },
+        async getPoolAddress(token0: Token, token1: Token, fee: number) {
+            return await readContract({
+                address: this.getAddress(Address.uniswapV3Factory) as `0x${string}`,
+                abi: uniswapV3FactoryAbi,
+                functionName: 'getPool',
+                args: [token0.address, token1.address, fee],
+            })
+        },
+        async getGeneralTokenInfo() {
+            const addressMap = this.tokensToQuery.find(x => x.network === this.connectedNetwork)?.addresses.map(x => x.address)
+
+            if (addressMap && addressMap.length > 0) {
+                const result = await multicall({
+                    calls: [
+                        ...addressMap.map((x: string) => ({
+                            abi: erc20ABI,
+                            contractAddress: x as `0x${string}`,
+                            calls: [
+                                ['name', []],
+                                ['symbol', []],
+                                ['decimals', []],
+                            ],
+                        })) as any[],
+                    ]
+                })
+
+                if (result.some((x: any) => x.status !== 'success')) {
+                    throw new Error(`Error getting general token info`)
+                }
+
+                const tempAvailableTokens: Token[] = []
+
+                let i = 0
+                for (const a of addressMap) {
+                    tempAvailableTokens.push({
+                        address: a,
+                        name: (result[i] as any).result,
+                        symbol: (result[i + 1] as any).result,
+                        decimals: (result[i + 2] as any).result,
+                    })
+                    i += 3
+                }
+
+                this.availableTokens = tempAvailableTokens
+            }
         },
     },
 })

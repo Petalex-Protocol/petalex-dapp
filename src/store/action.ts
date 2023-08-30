@@ -46,10 +46,23 @@ export const useActionStore = defineStore({
     },
     actions: {
         spliceAction(action: Action, index: number) {
+            const l = this.actions.length
+            if (l > 0 && index === l && this.actions[index - 1].name === 'FlashReturn') {
+                index -= 1
+            }
             this.actions.splice(index, 0, action)
         },
         removeAction(index: number) {
+            if (this.actions[index].name === 'Flash') {
+                const returnIndex = this.actions.findIndex(x => x.name === 'FlashReturn')
+                this.actions.splice(returnIndex, 1)
+            }
+            if (this.actions[index].name === 'FlashReturn') {
+                this.actions.splice(0, 1)
+                index -= 1
+            }
             this.actions.splice(index, 1)
+            
         },
     },
 })
