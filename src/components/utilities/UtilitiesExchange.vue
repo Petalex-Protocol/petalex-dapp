@@ -3,7 +3,9 @@ import { computed, ref, Ref, nextTick } from 'vue'
 import { useCoreStore, Token } from '../../store/core'
 import { useActionStore } from '../../store/action'
 import { convertFromDecimals, standardiseDecimals } from '../../utils/bn'
-import { watchPausable } from '@vueuse/core'
+import { watchPausable, refDebounced } from '@vueuse/core'
+import { solidityPacked } from 'ethers'
+import { sleep } from '../../utils/helpers'
 
 const core = useCoreStore()
 const actionStore = useActionStore()
@@ -13,23 +15,87 @@ const token0: Ref<Token> = ref({ address: '', name: '', symbol: '', decimals: 18
 const token1: Ref<Token> = ref({ address: '', name: '', symbol: '', decimals: 18 })
 const amount0 = ref(0)
 const amount1 = ref(0)
+const amount0Debounced = refDebounced(amount0, 500)
+const amount1Debounced = refDebounced(amount1, 500)
 const tokens = computed(() => core.availableTokens)
+const chosenFee = ref(0)
+const bestPriceImpact = ref(0)
+const slippage = ref(0.5)
 
-const { pause: pauseToken0Update, resume: resumeToken0Update } = watchPausable(amount0, async () => {
-    if (token0.value.address === '') return
+const { pause: pauseToken0Update, resume: resumeToken0Update } = watchPausable(amount0Debounced, async () => {
+    if (token0.value.address === '' || token1.value.address === '' || !amount0.value) return
+    if (token0.value.address === token1.value.address) return
     pauseToken1Update()
-    const quote = await core.getUniswapV3Quote(token0.value, token1.value, convertFromDecimals(amount0.value, token0.value.decimals))
-    amount1.value = standardiseDecimals(quote[0], token1.value.decimals)
+    pauseToken0SymbolUpdate()
+    pauseToken1SymbolUpdate()
+    loading.value = true
+    const { quote, fee, priceImpact } = await core.getUniswapV3Quote(token0.value, token1.value, convertFromDecimals(amount0.value, token0.value.decimals), true)
+    amount1.value = standardiseDecimals(quote.toString(), token1.value.decimals)
+    chosenFee.value = fee
+    bestPriceImpact.value = Number(priceImpact)
+    loading.value = false
+    await sleep(501)
     await nextTick()
     resumeToken1Update()
+    resumeToken0SymbolUpdate()
+    resumeToken1SymbolUpdate()
 })
 
-const { pause: pauseToken1Update, resume: resumeToken1Update } = watchPausable(amount1, async () => {
-    if (token1.value.address === '') return
+const { pause: pauseToken1Update, resume: resumeToken1Update } = watchPausable(amount1Debounced, async () => {
+    if (token0.value.address === '' || token1.value.address === '' || !amount1.value) return
+    if (token0.value.address === token1.value.address) return
     pauseToken0Update()
-    
+    pauseToken0SymbolUpdate()
+    pauseToken1SymbolUpdate()
+    loading.value = true
+    const { quote, fee, priceImpact } = await core.getUniswapV3Quote(token0.value, token1.value, convertFromDecimals(amount1.value, token1.value.decimals), false)
+    amount0.value = standardiseDecimals(quote.toString(), token0.value.decimals)
+    chosenFee.value = fee
+    bestPriceImpact.value = Number(priceImpact)
+    loading.value = false
+    await sleep(501)
     await nextTick()
     resumeToken0Update()
+    resumeToken0SymbolUpdate()
+    resumeToken1SymbolUpdate()
+})
+
+const { pause: pauseToken0SymbolUpdate, resume: resumeToken0SymbolUpdate } = watchPausable(token0, async () => {
+    if (token0.value.address === '' || token1.value.address === '' || !amount0.value) return
+    if (token0.value.address === token1.value.address) return
+    pauseToken1Update()
+    pauseToken0Update()
+    pauseToken1SymbolUpdate()
+    loading.value = true
+    const { quote, fee, priceImpact } = await core.getUniswapV3Quote(token0.value, token1.value, convertFromDecimals(amount0.value, token0.value.decimals), true)
+    amount1.value = standardiseDecimals(quote.toString(), token1.value.decimals)
+    chosenFee.value = fee
+    bestPriceImpact.value = Number(priceImpact)
+    loading.value = false
+    await sleep(501)
+    await nextTick()
+    resumeToken1Update()
+    resumeToken0Update()
+    resumeToken1SymbolUpdate()
+})
+
+const { pause: pauseToken1SymbolUpdate, resume: resumeToken1SymbolUpdate } = watchPausable(token1, async () => {
+    if (token0.value.address === '' || token1.value.address === '' || !amount0.value) return
+    if (token0.value.address === token1.value.address) return
+    pauseToken1Update()
+    pauseToken0Update()
+    pauseToken0SymbolUpdate()
+    loading.value = true
+    const { quote, fee, priceImpact } = await core.getUniswapV3Quote(token0.value, token1.value, convertFromDecimals(amount0.value, token0.value.decimals), true)
+    amount1.value = standardiseDecimals(quote.toString(), token1.value.decimals)
+    chosenFee.value = fee
+    bestPriceImpact.value = Number(priceImpact)
+    loading.value = false
+    await sleep(501)
+    await nextTick()
+    resumeToken1Update()
+    resumeToken0Update()
+    resumeToken0SymbolUpdate()
 })
 
 
@@ -49,8 +115,8 @@ const addAction = async () => {
         actionStore.spliceAction({
             name: 'UniswapV3ExactInput',
             displayName: 'Exchange',
-            // token, amount, amoutnOutMin, path
-            calldata: [token0.value.address, convertFromDecimals(amount0.value, token0.value.decimals), convertFromDecimals(amount1.value * 0.98, token1.value.decimals), ''],
+            // token, amount, amountOutMin, path
+            calldata: [token0.value.address, convertFromDecimals(amount0.value, token0.value.decimals), convertFromDecimals(amount1.value * ((100 - slippage.value) / 100), token1.value.decimals), solidityPacked(['address', 'uint24', 'address'], [token0.value.address, chosenFee.value, token1.value.address])],
             balanceChanges: [{
                 symbol: token0.value.symbol,
                 address: token0.value.address,
@@ -87,7 +153,15 @@ const addAction = async () => {
                     </option>
                 </select>
             </div>
-            <label class="label error">
+            <label v-if="chosenFee > 0" class="label">
+                <span class="label-text-alt"></span>
+                <span class="label-text-alt">Best liquidity found on {{ chosenFee / 10000 }}% fee pool</span> 
+            </label>
+            <label v-if="chosenFee > 0" class="label">
+                <span class="label-text-alt"></span>
+                <span class="label-text-alt">Price Impact: {{ bestPriceImpact / 10000 }}%</span> 
+            </label>
+            <label v-if="error" class="label error">
                 <span class="label-text-alt"></span>
                 <span class="label-text-alt text-error">{{ error }}</span>
             </label>

@@ -97,7 +97,7 @@ const addAction = async () => {
                     </label>
                 </div>
             </div>
-            <label class="label error">
+            <label v-if="error" class="label error">
                 <span class="label-text-alt"></span>
                 <span class="label-text-alt text-error">{{ error }}</span>
             </label>

@@ -6,6 +6,7 @@ import vesselManagerOperationsAbi from '../abi/gravita/vesselmanageroperations.j
 import uniswapV3FactoryAbi from '../abi/uniswap/uniswapv3factory.json'
 import uniswapQuoterV2Abi from '../abi/uniswap/uniswapquoterv2.json'
 import sortedVesselsAbi from '../abi/gravita/sortedVessels.json'
+import uniswapV3PoolAbi from '../abi/uniswap/uniswapv2pool.json'
 import oracleAbi from '../abi/gravita/oracle.json'
 import { getRandomInt } from "../utils/math"
 import { useActionStore } from "./action"
@@ -54,6 +55,7 @@ export interface CoreState {
     activeVessels: ActiveVessel[]
     availableTokens: Token[]
     tokensToQuery: AddressNetworkMap[]
+    uniswapV3FeeTiers: number[]
 }
 
 export interface ActiveVessel {
@@ -272,6 +274,7 @@ export const useCoreStore = defineStore({
                     ],
                 },
             ],
+            uniswapV3FeeTiers: [100, 500, 3000, 10000],
         } as CoreState),
     getters: {
         getNetworkAddressMap: (state: CoreState): AddressMap[] | undefined => {
@@ -516,7 +519,7 @@ export const useCoreStore = defineStore({
 
             this.gravitaCollateralInfo = infos
         },
-        async calculateGravitaHints(collateralAddress: string, coll: number, debt: number) {
+        async calculateGravitaHints(collateralAddress: string, coll: bigint, debt: bigint) {
             const sortedVesselsAddress = this.getAddress(Address.gravitaSortedVessels)
             const vesselManagerOperationsAddress = this.getAddress(Address.gravitaVesselManagerOperations)
             const result = await multicall({
@@ -633,11 +636,47 @@ export const useCoreStore = defineStore({
                 this.availableTokens = tempAvailableTokens
             }
         },
-        async getUniswapV3Quote(token0: Token, token1: Token, amount0: number) {
+        async getUniswapV3Quote(token0: Token, token1: Token, amount: bigint, input: boolean) {
             const provider = new JsonRpcProvider(chain.value.rpcUrls.default.http[0])
-            const c = new Contract(this.getAddress(Address.uniswapQuoterV2), uniswapQuoterV2Abi, provider) as any
-            const path = solidityPacked(['address', 'uint24', 'address'], [token0.address, 3000, token1.address])
-            return await c.quoteExactInput.staticCall(path, amount0.toString())
+            const c = new Contract(this.getAddress(Address.uniswapQuoterV2) as string, uniswapQuoterV2Abi, provider) as any
+            const factoryContract = new Contract(this.getAddress(Address.uniswapV3Factory) as string, uniswapV3FactoryAbi, provider) as any
+            let bestQuote: bigint = BigInt(0)
+            let bestFee: number = 0
+            let sqrtPriceX96After: bigint = BigInt(0)
+            let sqrtPriceX96Before: bigint = BigInt(0)
+            let priceImpact = BigInt(0)
+            for (const f of this.uniswapV3FeeTiers) {
+                const path = solidityPacked(['address', 'uint24', 'address'], [input ? token0.address : token1.address, f, input ? token1.address : token0.address])
+                // result is [amount0, sqrtPriceX96AfterList, ticksCrossedList, gasEstimate ]
+                try {
+                    const result = await c[input ? 'quoteExactInput' : 'quoteExactOutput'].staticCall(path, amount.toString())
+                    if (result[0] > bestQuote) {
+                        bestQuote = result[0]
+                        bestFee = f
+                        sqrtPriceX96After = result[1][0]
+
+                        const poolAddress = await factoryContract.getPool(token0.address, token1.address, f)
+                        const poolContract = new Contract(poolAddress, uniswapV3PoolAbi, provider) as any
+                        const slot0 = await poolContract.slot0()
+                        sqrtPriceX96Before = slot0[0]
+                    }
+                } catch {
+                    //console.log(e)
+                    // ignore as it just means there's no LP for this fee tier
+                }
+            }
+
+            if (bestFee > 0) {
+                const decimalAdjustment = BigInt(10) ** BigInt(token0.decimals > token1.decimals ? token0.decimals - token1.decimals : token1.decimals - token0.decimals)
+                // convert sqrtpricex96 to price
+                const priceBefore = ((sqrtPriceX96Before * decimalAdjustment) / BigInt(2 ** 96)) ** BigInt(2)
+                const priceAfter = ((sqrtPriceX96After * decimalAdjustment) / BigInt(2 ** 96)) ** BigInt(2)
+
+                // work out price impact (use price before and priceAfter difference as %)
+                priceImpact = ((priceAfter - priceBefore) * BigInt(1000000)) / priceBefore
+            }
+
+            return { quote: bestQuote, fee: bestFee, priceImpact }
         },
     },
 })
