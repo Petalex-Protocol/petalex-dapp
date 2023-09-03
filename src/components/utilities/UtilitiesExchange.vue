@@ -11,8 +11,8 @@ const core = useCoreStore()
 const actionStore = useActionStore()
 
 const loading = ref(false)
-const token0: Ref<Token> = ref({ address: '', name: '', symbol: '', decimals: 18 })
-const token1: Ref<Token> = ref({ address: '', name: '', symbol: '', decimals: 18 })
+const token0: Ref<Token> = ref({ address: '', name: '', symbol: '', decimals: 18, price: '0' })
+const token1: Ref<Token> = ref({ address: '', name: '', symbol: '', decimals: 18, price: '0' })
 const amount0 = ref(0)
 const amount1 = ref(0)
 const amount0Debounced = refDebounced(amount0, 500)
@@ -29,7 +29,7 @@ const { pause: pauseToken0Update, resume: resumeToken0Update } = watchPausable(a
     pauseToken0SymbolUpdate()
     pauseToken1SymbolUpdate()
     loading.value = true
-    const { quote, fee, priceImpact } = await core.getUniswapV3Quote(token0.value, token1.value, convertFromDecimals(amount0.value, token0.value.decimals), true)
+    const { quote, fee, priceImpact } = await core.getUniswapV3Quote(token0.value, token1.value, amount0.value, true)
     amount1.value = standardiseDecimals(quote.toString(), token1.value.decimals)
     chosenFee.value = fee
     bestPriceImpact.value = Number(priceImpact)
@@ -48,7 +48,7 @@ const { pause: pauseToken1Update, resume: resumeToken1Update } = watchPausable(a
     pauseToken0SymbolUpdate()
     pauseToken1SymbolUpdate()
     loading.value = true
-    const { quote, fee, priceImpact } = await core.getUniswapV3Quote(token0.value, token1.value, convertFromDecimals(amount1.value, token1.value.decimals), false)
+    const { quote, fee, priceImpact } = await core.getUniswapV3Quote(token0.value, token1.value, amount1.value, false)
     amount0.value = standardiseDecimals(quote.toString(), token0.value.decimals)
     chosenFee.value = fee
     bestPriceImpact.value = Number(priceImpact)
@@ -67,7 +67,7 @@ const { pause: pauseToken0SymbolUpdate, resume: resumeToken0SymbolUpdate } = wat
     pauseToken0Update()
     pauseToken1SymbolUpdate()
     loading.value = true
-    const { quote, fee, priceImpact } = await core.getUniswapV3Quote(token0.value, token1.value, convertFromDecimals(amount0.value, token0.value.decimals), true)
+    const { quote, fee, priceImpact } = await core.getUniswapV3Quote(token0.value, token1.value, amount0.value, true)
     amount1.value = standardiseDecimals(quote.toString(), token1.value.decimals)
     chosenFee.value = fee
     bestPriceImpact.value = Number(priceImpact)
@@ -86,7 +86,7 @@ const { pause: pauseToken1SymbolUpdate, resume: resumeToken1SymbolUpdate } = wat
     pauseToken0Update()
     pauseToken0SymbolUpdate()
     loading.value = true
-    const { quote, fee, priceImpact } = await core.getUniswapV3Quote(token0.value, token1.value, convertFromDecimals(amount0.value, token0.value.decimals), true)
+    const { quote, fee, priceImpact } = await core.getUniswapV3Quote(token0.value, token1.value, amount0.value, true)
     amount1.value = standardiseDecimals(quote.toString(), token1.value.decimals)
     chosenFee.value = fee
     bestPriceImpact.value = Number(priceImpact)
@@ -115,7 +115,7 @@ const addAction = async () => {
         actionStore.spliceAction({
             name: 'UniswapV3ExactInput',
             displayName: 'Exchange',
-            // token, amount, amountOutMin, path
+            // token, amount, amoutnOutMin, path
             calldata: [token0.value.address, convertFromDecimals(amount0.value, token0.value.decimals), convertFromDecimals(amount1.value * ((100 - slippage.value) / 100), token1.value.decimals), solidityPacked(['address', 'uint24', 'address'], [token0.value.address, chosenFee.value, token1.value.address])],
             balanceChanges: [{
                 symbol: token0.value.symbol,
@@ -159,7 +159,13 @@ const addAction = async () => {
             </label>
             <label v-if="chosenFee > 0" class="label">
                 <span class="label-text-alt"></span>
-                <span class="label-text-alt">Price Impact: {{ bestPriceImpact / 10000 }}%</span> 
+                <span class="label-text-alt flex gap-1">Price Impact: {{ bestPriceImpact.toFixed(3) }}%
+                    <span class="tooltip" data-tip="Price impact measured from aggregated market price">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                        </svg>
+                    </span>
+                </span> 
             </label>
             <label v-if="error" class="label error">
                 <span class="label-text-alt"></span>

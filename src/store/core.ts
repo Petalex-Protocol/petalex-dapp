@@ -6,11 +6,12 @@ import vesselManagerOperationsAbi from '../abi/gravita/vesselmanageroperations.j
 import uniswapV3FactoryAbi from '../abi/uniswap/uniswapv3factory.json'
 import uniswapQuoterV2Abi from '../abi/uniswap/uniswapquoterv2.json'
 import sortedVesselsAbi from '../abi/gravita/sortedVessels.json'
-import uniswapV3PoolAbi from '../abi/uniswap/uniswapv2pool.json'
 import oracleAbi from '../abi/gravita/oracle.json'
 import { getRandomInt } from "../utils/math"
 import { useActionStore } from "./action"
 import { Contract, JsonRpcProvider, solidityPacked } from "ethers"
+import { CoinResult, getCoins } from "../utils/defillama_api"
+import { convertFromDecimals, standardiseDecimals } from "../utils/bn"
 
 export enum Network {
     goerli = "goerli",
@@ -72,7 +73,6 @@ export interface GravitaCollateralInfo extends Token {
     minCollateralRatio: string
     recoveryCollateralRadio: string
     priceFeed: string
-    price: string
     priceDecimals: string
     isPriceEthIndexed: boolean
 }
@@ -82,6 +82,7 @@ export interface Token {
     name: string
     symbol: string
     decimals: number
+    price: string
 }
 
 export const useCoreStore = defineStore({
@@ -620,6 +621,10 @@ export const useCoreStore = defineStore({
                     throw new Error(`Error getting general token info`)
                 }
 
+
+                const defillamaNetwork = this.connectedNetwork === Network.homestead ? 'ethereum' : this.connectedNetwork
+                const defillamaCoinResult = await getCoins(addressMap.map(x => `${defillamaNetwork}:${x}`))
+
                 const tempAvailableTokens: Token[] = []
 
                 let i = 0
@@ -629,6 +634,7 @@ export const useCoreStore = defineStore({
                         name: (result[i] as any).result,
                         symbol: (result[i + 1] as any).result,
                         decimals: (result[i + 2] as any).result,
+                        price: defillamaCoinResult.coins[`${defillamaNetwork}:${a}`]?.price?.toString() || '0',
                     })
                     i += 3
                 }
@@ -636,44 +642,41 @@ export const useCoreStore = defineStore({
                 this.availableTokens = tempAvailableTokens
             }
         },
-        async getUniswapV3Quote(token0: Token, token1: Token, amount: bigint, input: boolean) {
+        async getUniswapV3Quote(token0: Token, token1: Token, amount: number, input: boolean) {
             const provider = new JsonRpcProvider(chain.value.rpcUrls.default.http[0])
             const c = new Contract(this.getAddress(Address.uniswapQuoterV2) as string, uniswapQuoterV2Abi, provider) as any
-            const factoryContract = new Contract(this.getAddress(Address.uniswapV3Factory) as string, uniswapV3FactoryAbi, provider) as any
             let bestQuote: bigint = BigInt(0)
             let bestFee: number = 0
-            let sqrtPriceX96After: bigint = BigInt(0)
-            let sqrtPriceX96Before: bigint = BigInt(0)
-            let priceImpact = BigInt(0)
+            let priceImpact = 0
+            const convertedAmount = input ? convertFromDecimals(amount, token0.decimals) : convertFromDecimals(amount, token1.decimals)
+
             for (const f of this.uniswapV3FeeTiers) {
                 const path = solidityPacked(['address', 'uint24', 'address'], [input ? token0.address : token1.address, f, input ? token1.address : token0.address])
                 // result is [amount0, sqrtPriceX96AfterList, ticksCrossedList, gasEstimate ]
                 try {
-                    const result = await c[input ? 'quoteExactInput' : 'quoteExactOutput'].staticCall(path, amount.toString())
-                    if (result[0] > bestQuote) {
+                    const result = await c[input ? 'quoteExactInput' : 'quoteExactOutput'].staticCall(path, convertedAmount.toString())
+                    if (bestQuote === BigInt(0)) {
                         bestQuote = result[0]
                         bestFee = f
-                        sqrtPriceX96After = result[1][0]
-
-                        const poolAddress = await factoryContract.getPool(token0.address, token1.address, f)
-                        const poolContract = new Contract(poolAddress, uniswapV3PoolAbi, provider) as any
-                        const slot0 = await poolContract.slot0()
-                        sqrtPriceX96Before = slot0[0]
+                    } else if (input ? result[0] > bestQuote : result[0] < bestQuote) {
+                        bestQuote = result[0]
+                        bestFee = f
                     }
                 } catch {
-                    //console.log(e)
+                    // console.log(e)
                     // ignore as it just means there's no LP for this fee tier
                 }
             }
 
             if (bestFee > 0) {
-                const decimalAdjustment = BigInt(10) ** BigInt(token0.decimals > token1.decimals ? token0.decimals - token1.decimals : token1.decimals - token0.decimals)
-                // convert sqrtpricex96 to price
-                const priceBefore = ((sqrtPriceX96Before * decimalAdjustment) / BigInt(2 ** 96)) ** BigInt(2)
-                const priceAfter = ((sqrtPriceX96After * decimalAdjustment) / BigInt(2 ** 96)) ** BigInt(2)
+                // get general market price of token0 in token1
+                const token0Price = Number(this.availableTokens.find(x => x.address === token0.address)?.price || '0') 
+                const token1Price = Number(this.availableTokens.find(x => x.address === token1.address)?.price || '0')
+                const marketPrice = input ? token0Price / token1Price : token1Price / token0Price
 
-                // work out price impact (use price before and priceAfter difference as %)
-                priceImpact = ((priceAfter - priceBefore) * BigInt(1000000)) / priceBefore
+                // get price impact by comparing market price to uniswap quote
+                const percentage = Number(standardiseDecimals(bestQuote, input ? token1.decimals : token0.decimals)) / (marketPrice * amount)
+                priceImpact = (input ? percentage - 1 : 1 - percentage) * 100
             }
 
             return { quote: bestQuote, fee: bestFee, priceImpact }

@@ -14,7 +14,7 @@ const countDecimals = (value: number) => {
     return 0;
   }
 
-export const standardiseDecimals = (amount: string | number | undefined, decimals: string | number) => {
+export const standardiseDecimals = (amount: string | number | bigint | undefined, decimals: string | number) => {
     if (!amount) return 0
     return Number(amount) / (10 ** Number(decimals))
 }
@@ -26,8 +26,5 @@ export const convertFromDecimals = (amount: string | number | undefined, decimal
     if (decimalPlaces <= 0) {
         return BigInt(amountNumber) * (BigInt(10) ** BigInt(decimals))
     }
-    console.log(amountNumber)
-    console.log(decimalPlaces)
-    console.log((BigInt(amountNumber * (10 ** decimalPlaces)) * (BigInt(10) ** BigInt(decimals))) / BigInt(10 ** decimalPlaces))
-    return (BigInt(amountNumber * (10 ** decimalPlaces)) * (BigInt(10) ** BigInt(decimals))) / BigInt(10 ** decimalPlaces)
+    return (BigInt(Math.floor(amountNumber * (10 ** decimalPlaces))) * (BigInt(10) ** BigInt(decimals))) / BigInt(10 ** decimalPlaces)
 }
