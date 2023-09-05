@@ -642,44 +642,98 @@ export const useCoreStore = defineStore({
                 this.availableTokens = tempAvailableTokens
             }
         },
-        async getUniswapV3Quote(token0: Token, token1: Token, amount: number, input: boolean) {
+        async getUniswapV3Quote(token0: Token, token1: Token, amount: number, input: boolean, intermediateTokens: Token[] = []) {
             const provider = new JsonRpcProvider(chain.value.rpcUrls.default.http[0])
             const c = new Contract(this.getAddress(Address.uniswapQuoterV2) as string, uniswapQuoterV2Abi, provider) as any
             let bestQuote: bigint = BigInt(0)
-            let bestFee: number = 0
+            let bestPath: any[] = []
+            let pathCallData: string = ''
             let priceImpact = 0
-            const convertedAmount = input ? convertFromDecimals(amount, token0.decimals) : convertFromDecimals(amount, token1.decimals)
 
-            for (const f of this.uniswapV3FeeTiers) {
-                const path = solidityPacked(['address', 'uint24', 'address'], [input ? token0.address : token1.address, f, input ? token1.address : token0.address])
-                // result is [amount0, sqrtPriceX96AfterList, ticksCrossedList, gasEstimate ]
-                try {
-                    const result = await c[input ? 'quoteExactInput' : 'quoteExactOutput'].staticCall(path, convertedAmount.toString())
-                    if (bestQuote === BigInt(0)) {
-                        bestQuote = result[0]
-                        bestFee = f
-                    } else if (input ? result[0] > bestQuote : result[0] < bestQuote) {
-                        bestQuote = result[0]
-                        bestFee = f
-                    }
-                } catch {
-                    // console.log(e)
-                    // ignore as it just means there's no LP for this fee tier
-                }
+            let fromToken = token0
+            let toToken = token1
+            let hops = intermediateTokens
+            if (!input) {
+                fromToken = token1
+                toToken = token0
+                hops = intermediateTokens.reverse()
             }
 
-            if (bestFee > 0) {
+            const convertedAmount = convertFromDecimals(amount, fromToken.decimals)
+            const combinations = this.uniswapV3FeeTiers.length ** (hops.length + 1)
+
+            // get all combinations of fee tiers for the hops as an array of arrays e.g. [[100, 100, 100], [100, 100, 500], [100, 100, 3000], [100, 100, 1000], [300, 100, 100], [300, 100, 300] ...]
+            const feeTierCombinations: number[][] = []
+            for (let i = 0; i < combinations; ++i) {
+                const combination: number[] = []
+                let j = i
+                for (let k = 0; k < hops.length + 1; ++k) {
+                    combination.push(this.uniswapV3FeeTiers[j % this.uniswapV3FeeTiers.length])
+                    j = Math.floor(j / this.uniswapV3FeeTiers.length)
+                }
+                feeTierCombinations.push(combination)
+            } // thank you copilot
+
+            // get the best quote for each combination
+            const allPaths = []
+            for (const f of feeTierCombinations) {
+                const types = f.reduce((p, c) => {
+                    p.push('uint24')
+                    p.push('address')
+                    return p
+                }, ['address'])
+                const values = f.reduce((p, c, i) => {
+                    p.push(c)
+                    p.push(intermediateTokens[i]?.address || toToken.address)
+                    return p
+                }, [fromToken.address] as any[])
+                allPaths.push(solidityPacked(types, values))
+            }
+
+            // don't care about gas for multicall as the lib does it for us
+            const result = await multicall({
+                calls: [
+                    ...allPaths.map((x: string) => ({
+                        abi: uniswapQuoterV2Abi,
+                        contractAddress: this.getAddress(Address.uniswapQuoterV2) as `0x${string}`,
+                        calls: [
+                            [input ? 'quoteExactInput' : 'quoteExactOutput', [x, convertedAmount.toString()]],
+                        ],
+                    })) as any[],
+                ]
+            })
+
+            // get the best quote
+            let i = 0
+            for (const r of result) {
+                const data = r as any
+                if (data.status === 'success') {
+                    const quote = data.result[0]
+                    if (bestQuote === BigInt(0)) {
+                        bestQuote = quote
+                        bestPath = feeTierCombinations[i]
+                        pathCallData = allPaths[i]
+                    } else if (input ? quote > bestQuote : quote < bestQuote) {
+                        bestQuote = quote
+                        bestPath = feeTierCombinations[i]
+                        pathCallData = allPaths[i]
+                    }
+                }
+                ++i
+            }
+
+            if (bestPath.length > 0) {
                 // get general market price of token0 in token1
-                const token0Price = Number(this.availableTokens.find(x => x.address === token0.address)?.price || '0') 
-                const token1Price = Number(this.availableTokens.find(x => x.address === token1.address)?.price || '0')
-                const marketPrice = input ? token0Price / token1Price : token1Price / token0Price
+                const fromTokenPrice = Number(this.availableTokens.find(x => x.address === fromToken.address)?.price || '0') 
+                const toTokenPrice = Number(this.availableTokens.find(x => x.address === toToken.address)?.price || '0')
+                const marketPrice = fromTokenPrice / toTokenPrice
 
                 // get price impact by comparing market price to uniswap quote
-                const percentage = Number(standardiseDecimals(bestQuote, input ? token1.decimals : token0.decimals)) / (marketPrice * amount)
+                const percentage = Number(standardiseDecimals(bestQuote, toToken.decimals)) / (marketPrice * amount)
                 priceImpact = (input ? percentage - 1 : 1 - percentage) * 100
             }
 
-            return { quote: bestQuote, fee: bestFee, priceImpact }
+            return { quote: bestQuote, path: bestPath, pathCallData, priceImpact }
         },
     },
 })

@@ -1,108 +1,60 @@
 <script setup lang="ts">
-import { computed, ref, Ref, nextTick } from 'vue'
+import { computed, ref } from 'vue'
 import { useCoreStore, Token } from '../../store/core'
 import { useActionStore } from '../../store/action'
 import { convertFromDecimals, standardiseDecimals } from '../../utils/bn'
-import { watchPausable, refDebounced } from '@vueuse/core'
-import { solidityPacked } from 'ethers'
-import { sleep } from '../../utils/helpers'
+import { useDebounceFn } from '@vueuse/core'
 
 const core = useCoreStore()
 const actionStore = useActionStore()
 
 const loading = ref(false)
-const token0: Ref<Token> = ref({ address: '', name: '', symbol: '', decimals: 18, price: '0' })
-const token1: Ref<Token> = ref({ address: '', name: '', symbol: '', decimals: 18, price: '0' })
+const token0 = ref<Token>({ address: '', name: '', symbol: '', decimals: 18, price: '0' })
+const token1 = ref<Token>({ address: '', name: '', symbol: '', decimals: 18, price: '0' })
+const intermediateTokens = ref<Token[]>([])
 const amount0 = ref(0)
 const amount1 = ref(0)
-const amount0Debounced = refDebounced(amount0, 500)
-const amount1Debounced = refDebounced(amount1, 500)
 const tokens = computed(() => core.availableTokens)
-const chosenFee = ref(0)
+const chosenPath = ref<any[]>([])
+const chosenPathCallData = ref<string>('')
 const bestPriceImpact = ref(0)
 const slippage = ref(0.5)
 
-const { pause: pauseToken0Update, resume: resumeToken0Update } = watchPausable(amount0Debounced, async () => {
-    if (token0.value.address === '' || token1.value.address === '' || !amount0.value) return
-    if (token0.value.address === token1.value.address) return
-    pauseToken1Update()
-    pauseToken0SymbolUpdate()
-    pauseToken1SymbolUpdate()
-    loading.value = true
-    const { quote, fee, priceImpact } = await core.getUniswapV3Quote(token0.value, token1.value, amount0.value, true)
-    amount1.value = standardiseDecimals(quote.toString(), token1.value.decimals)
-    chosenFee.value = fee
-    bestPriceImpact.value = Number(priceImpact)
-    loading.value = false
-    await sleep(501)
-    await nextTick()
-    resumeToken1Update()
-    resumeToken0SymbolUpdate()
-    resumeToken1SymbolUpdate()
+const pathText = computed(() => {
+    let text = `${token0.value.symbol} `
+    for (let i = 0; i < chosenPath.value.length; i++) {
+        text += `${chosenPath.value[i] / 10000}% -> ${intermediateTokens.value[i]?.symbol || token1.value.symbol} `
+    }    
+    return text
 })
 
-const { pause: pauseToken1Update, resume: resumeToken1Update } = watchPausable(amount1Debounced, async () => {
-    if (token0.value.address === '' || token1.value.address === '' || !amount1.value) return
+const calculateAmounts = async (input: boolean) => {
+    if (loading.value || token0.value.address === '' || token1.value.address === '') return
     if (token0.value.address === token1.value.address) return
-    pauseToken0Update()
-    pauseToken0SymbolUpdate()
-    pauseToken1SymbolUpdate()
+    if (intermediateTokens.value.some(token => token.address === '')) return
+    if (intermediateTokens.value.some(token => token.address === token0.value.address || token.address === token1.value.address)) return
+    if (input && !amount0.value) return
+    if (!input && !amount1.value) return
+
     loading.value = true
-    const { quote, fee, priceImpact } = await core.getUniswapV3Quote(token0.value, token1.value, amount1.value, false)
-    amount0.value = standardiseDecimals(quote.toString(), token0.value.decimals)
-    chosenFee.value = fee
+    const { quote, path, pathCallData, priceImpact } = await core.getUniswapV3Quote(token0.value, token1.value, input ? amount0.value : amount1.value, input, intermediateTokens.value)
+    if (input) {
+        amount1.value = standardiseDecimals(quote.toString(), token1.value.decimals)
+    } else {
+        amount0.value = standardiseDecimals(quote.toString(), token0.value.decimals)
+    }
+    chosenPathCallData.value = pathCallData
+    chosenPath.value = path
     bestPriceImpact.value = Number(priceImpact)
     loading.value = false
-    await sleep(501)
-    await nextTick()
-    resumeToken0Update()
-    resumeToken0SymbolUpdate()
-    resumeToken1SymbolUpdate()
-})
+}
 
-const { pause: pauseToken0SymbolUpdate, resume: resumeToken0SymbolUpdate } = watchPausable(token0, async () => {
-    if (token0.value.address === '' || token1.value.address === '' || !amount0.value) return
-    if (token0.value.address === token1.value.address) return
-    pauseToken1Update()
-    pauseToken0Update()
-    pauseToken1SymbolUpdate()
-    loading.value = true
-    const { quote, fee, priceImpact } = await core.getUniswapV3Quote(token0.value, token1.value, amount0.value, true)
-    amount1.value = standardiseDecimals(quote.toString(), token1.value.decimals)
-    chosenFee.value = fee
-    bestPriceImpact.value = Number(priceImpact)
-    loading.value = false
-    await sleep(501)
-    await nextTick()
-    resumeToken1Update()
-    resumeToken0Update()
-    resumeToken1SymbolUpdate()
-})
-
-const { pause: pauseToken1SymbolUpdate, resume: resumeToken1SymbolUpdate } = watchPausable(token1, async () => {
-    if (token0.value.address === '' || token1.value.address === '' || !amount0.value) return
-    if (token0.value.address === token1.value.address) return
-    pauseToken1Update()
-    pauseToken0Update()
-    pauseToken0SymbolUpdate()
-    loading.value = true
-    const { quote, fee, priceImpact } = await core.getUniswapV3Quote(token0.value, token1.value, amount0.value, true)
-    amount1.value = standardiseDecimals(quote.toString(), token1.value.decimals)
-    chosenFee.value = fee
-    bestPriceImpact.value = Number(priceImpact)
-    loading.value = false
-    await sleep(501)
-    await nextTick()
-    resumeToken1Update()
-    resumeToken0Update()
-    resumeToken0SymbolUpdate()
-})
-
+const calculateAmountsDebounced = useDebounceFn(calculateAmounts, 500)
 
 const error = computed(() => {
     if (amount0.value === 0 && amount1.value === 0) return 'Must specify an amount on at least one token'
-    if (token0.value.address === '' || token1.value.address === '') return 'Must specify a token'
-    if (token0.value.address === token1.value.address) return 'Tokens must be different'
+    if (token0.value.address === '' || token1.value.address === '' || intermediateTokens.value.some(token => token.address === '')) return 'Must specify a token'
+    if (token0.value.address === token1.value.address || intermediateTokens.value.some(token => token.address === token0.value.address || token.address === token1.value.address)) return 'Tokens must be different'
     return null
 })
 
@@ -116,7 +68,7 @@ const addAction = async () => {
             name: 'UniswapV3ExactInput',
             displayName: 'Exchange',
             // token, amount, amoutnOutMin, path
-            calldata: [token0.value.address, convertFromDecimals(amount0.value, token0.value.decimals), convertFromDecimals(amount1.value * ((100 - slippage.value) / 100), token1.value.decimals), solidityPacked(['address', 'uint24', 'address'], [token0.value.address, chosenFee.value, token1.value.address])],
+            calldata: [token0.value.address, convertFromDecimals(amount0.value, token0.value.decimals), convertFromDecimals(amount1.value * ((100 - slippage.value) / 100), token1.value.decimals), chosenPathCallData.value],
             balanceChanges: [{
                 symbol: token0.value.symbol,
                 address: token0.value.address,
@@ -131,6 +83,10 @@ const addAction = async () => {
         loading.value = false
     }
 }
+
+const addHop = () => {
+    intermediateTokens.value.push({ address: '', name: '', symbol: '', decimals: 18, price: '0' })
+}
 </script>
 
 <template>
@@ -138,26 +94,33 @@ const addAction = async () => {
         <div class="card-body">
             <h2 class="card-title">Exchange</h2>
             <div class="join">
-                <input class="input input-bordered join-item w-full" v-model="amount0"/>
-                <select class="select select-bordered join-item" v-model="token0">
+                <input class="input input-bordered join-item w-full" v-model="amount0" @input="calculateAmountsDebounced(true)"/>
+                <select class="select select-bordered join-item" v-model="token0" @change="calculateAmounts(true)">
+                    <option v-for="token in tokens" :key="token.address" :value="token">
+                        {{ token.symbol }}
+                    </option>
+                </select>
+            </div>
+            <div v-for="(_, i) in intermediateTokens">
+                <select class="select select-bordered w-full" v-model="intermediateTokens[i]" @change="calculateAmounts(true)">
                     <option v-for="token in tokens" :key="token.address" :value="token">
                         {{ token.symbol }}
                     </option>
                 </select>
             </div>
             <div class="join">
-                <input class="input input-bordered join-item w-full" v-model="amount1"/>
-                <select class="select select-bordered join-item" v-model="token1">
+                <input class="input input-bordered join-item w-full" v-model="amount1" @input="calculateAmountsDebounced(false)"/>
+                <select class="select select-bordered join-item" v-model="token1" @change="calculateAmounts(true)">
                     <option v-for="token in tokens" :key="token.address" :value="token">
                         {{ token.symbol }}
                     </option>
                 </select>
             </div>
-            <label v-if="chosenFee > 0" class="label">
+            <label v-if="chosenPath.length > 0" class="label">
                 <span class="label-text-alt"></span>
-                <span class="label-text-alt">Best liquidity found on {{ chosenFee / 10000 }}% fee pool</span> 
+                <span class="label-text-alt">Best route - {{ pathText }}</span> 
             </label>
-            <label v-if="chosenFee > 0" class="label">
+            <label v-if="chosenPath.length > 0" class="label">
                 <span class="label-text-alt"></span>
                 <span class="label-text-alt flex gap-1">Price Impact: {{ bestPriceImpact.toFixed(3) }}%
                     <span class="tooltip" data-tip="Price impact measured from aggregated market price">
@@ -172,6 +135,7 @@ const addAction = async () => {
                 <span class="label-text-alt text-error">{{ error }}</span>
             </label>
             <div class="card-actions justify-end">
+                <button class="btn btn-secondary" :disabled="loading" @click="addHop">Add Hop</button>
                 <button class="btn btn-primary" :disabled="error !== null || loading" @click="addAction">Add Action <span v-if="loading" class="loading loading-spinner"></span></button>
             </div>
         </div>
