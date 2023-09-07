@@ -2,55 +2,61 @@ import { createRouter, createWebHistory, RouteRecordRaw } from "vue-router"
 
 const routes: Array<RouteRecordRaw> = [
     {
-        path: "/gravita",
-        component: () => import("../components/gravita/GravitaBase.vue"),
+        path: "/",
+        component: () => import("../components/petalex/PetalexBase.vue"),
         children: [
             {
-                path: "open",
-                component: () => import("../components/gravita/GravitaOpen.vue"),
+                path: "gravita",
+                component: () => import("../components/gravita/GravitaBase.vue"),
+                children: [
+                    {
+                        path: "open",
+                        component: () => import("../components/gravita/GravitaOpen.vue"),
+                    },
+                    {
+                        path: "adjust",
+                        component: () => import("../components/gravita/GravitaAdjust.vue"),
+                    },
+                    {
+                        path: "close",
+                        component: () => import("../components/gravita/GravitaClose.vue"),
+                    }
+                ],
             },
             {
-                path: "adjust",
-                component: () => import("../components/gravita/GravitaAdjust.vue"),
+                path: "liquity",
+                component: () => import("../components/liquity/LiquityBase.vue"),
+                children: [
+                    {
+                        path: "open",
+                        component: () => import("../components/liquity/LiquityOpen.vue"),
+                    },
+                    {
+                        path: "adjust",
+                        component: () => import("../components/liquity/LiquityAdjust.vue"),
+                    },
+                    {
+                        path: "close",
+                        component: () => import("../components/liquity/LiquityClose.vue"),
+                    }
+                ],
             },
             {
-                path: "close",
-                component: () => import("../components/gravita/GravitaClose.vue"),
-            }
+                path: "utilities",
+                component: () => import("../components/utilities/UtilitiesBase.vue"),
+                children: [
+                    {
+                        path: "flash",
+                        component: () => import("../components/utilities/UtilitiesFlash.vue"),
+                    },
+                    {
+                        path: "exchange",
+                        component: () => import("../components/utilities/UtilitiesExchange.vue"),
+                    },
+                ],
+            },
         ],
-    },
-    {
-        path: "/liquity",
-        component: () => import("../components/liquity/LiquityBase.vue"),
-        children: [
-            {
-                path: "open",
-                component: () => import("../components/liquity/LiquityOpen.vue"),
-            },
-            {
-                path: "adjust",
-                component: () => import("../components/liquity/LiquityAdjust.vue"),
-            },
-            {
-                path: "close",
-                component: () => import("../components/liquity/LiquityClose.vue"),
-            }
-        ],
-    },
-    {
-        path: "/utilities",
-        component: () => import("../components/utilities/UtilitiesBase.vue"),
-        children: [
-            {
-                path: "flash",
-                component: () => import("../components/utilities/UtilitiesFlash.vue"),
-            },
-            {
-                path: "exchange",
-                component: () => import("../components/utilities/UtilitiesExchange.vue"),
-            },
-        ],
-    }
+    },    
 ]
 
 const router = createRouter({

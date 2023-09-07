@@ -1,28 +1,29 @@
 import { defineStore } from "pinia"
-import { erc20ABI, multicall, account, readContract, chain } from '@kolirt/vue-web3-auth'
+import { erc20ABI, multicall, account, readContract, chain, writeContract } from '@kolirt/vue-web3-auth'
 import adminAbi from '../abi/gravita/admin.json'
 import priceFeedAbi from '../abi/gravita/pricefeed.json'
 import vesselManagerOperationsAbi from '../abi/gravita/vesselmanageroperations.json'
 import uniswapV3FactoryAbi from '../abi/uniswap/uniswapv3factory.json'
 import uniswapQuoterV2Abi from '../abi/uniswap/uniswapquoterv2.json'
 import sortedVesselsAbi from '../abi/gravita/sortedVessels.json'
+import petalexAbi from '../abi/petalex/petalexnft.json'
 import oracleAbi from '../abi/gravita/oracle.json'
 import { getRandomInt } from "../utils/math"
 import { useActionStore } from "./action"
 import { Contract, JsonRpcProvider, solidityPacked } from "ethers"
-import { CoinResult, getCoins } from "../utils/defillama_api"
+import { getCoins } from "../utils/defillama_api"
 import { convertFromDecimals, standardiseDecimals } from "../utils/bn"
 
 export enum Network {
-    goerli = "goerli",
+    // goerli = "goerli",
     homestead = "homestead",
     arbitrum = "arbitrum",
-    optimism = "optimism",
+    // optimism = "optimism",
 }
 
 export enum Address {
     petalexNft = "petalexNft",
-    actioneExecutor = "actioneExecutor",
+    actionExecutor = "actionExecutor",
     gravitaAdmin = "gravitaAdmin",
     gravitaVesselManagerOperations = "gravitaVesselManagerOperations",
     gravitaSortedVessels = "gravitaSortedVessels",
@@ -57,6 +58,7 @@ export interface CoreState {
     availableTokens: Token[]
     tokensToQuery: AddressNetworkMap[]
     uniswapV3FeeTiers: number[]
+    ownedTokens: number[]
 }
 
 export interface ActiveVessel {
@@ -89,46 +91,17 @@ export const useCoreStore = defineStore({
     id: "core",
     state: () =>
         ({
-            addresses: [
-                {
-                    network: Network.goerli,
-                    addresses: [
-                        {
-                            name: Address.petalexNft,
-                            address: "0x0",
-                        },
-                        {
-                            name: Address.gravitaAdmin,
-                            address: "0xfE4d1A4616Db87a669B9A5eA9E9092cb0cA36511",
-                        },
-                        {
-                            name: Address.gravitaVesselManagerOperations,
-                            address: "0x6001E43a15c3c253960eB17ae062AC5F5436fe25",
-                        },
-                        {
-                            name: Address.gravitaSortedVessels,
-                            address: "0x652dbFCBcB0d3A2EA1DF9402085cd9E5b94D6E6D",
-                        },
-                        {
-                            name: Address.gravitaDebtToken,
-                            address: "0xb0e99590cF3Ddfdc19e68F91f7fe0626790cDb53",
-                        },
-                        {
-                            name: Address.uniswapV3Factory,
-                            address: "0x1F98431c8aD98523631AE4a59f267346ea31F984",
-                        },
-                        {
-                            name: Address.uniswapQuoterV2,
-                            address: "0x61fFE014bA17989E743c5F6cB21bF9697530B21e",
-                        },
-                    ],
-                },
+            addresses: [                
                 {
                     network: Network.homestead,
                     addresses: [
                         {
                             name: Address.petalexNft,
-                            address: "0x0",
+                            address: "0xc550A4f27991a934EEdEc1bb7de29d2ae1047619",
+                        },
+                        {
+                            name: Address.actionExecutor,
+                            address: "0x5D3c1eeC1Ed7614886D7076caBaA6219B6175129",
                         },
                         {
                             name: Address.gravitaAdmin,
@@ -160,10 +133,6 @@ export const useCoreStore = defineStore({
                     network: Network.arbitrum,
                     addresses: [
                         {
-                            name: Address.petalexNft,
-                            address: "0x0",
-                        },
-                        {
                             name: Address.gravitaAdmin,
                             address: "0x4928c8F8c20A1E3C295DddBe05095A9aBBdB3d14",
                         },
@@ -190,20 +159,11 @@ export const useCoreStore = defineStore({
                     ],
                 },
             ],
-            connectedNetwork: Network.goerli,
+            connectedNetwork: Network.homestead,
             gravitaCollateralInfo: [],
             activeVessels: [],
             availableTokens: [],
-            tokensToQuery: [
-                {
-                    network: Network.goerli,
-                    addresses: [
-                        {
-                            name: Address.weth,
-                            address: '',
-                        }
-                    ],
-                },
+            tokensToQuery: [                
                 {
                     network: Network.homestead,
                     addresses: [
@@ -276,6 +236,7 @@ export const useCoreStore = defineStore({
                 },
             ],
             uniswapV3FeeTiers: [100, 500, 3000, 10000],
+            ownedTokens: [],
         } as CoreState),
     getters: {
         getNetworkAddressMap: (state: CoreState): AddressMap[] | undefined => {
@@ -618,9 +579,9 @@ export const useCoreStore = defineStore({
                 })
 
                 if (result.some((x: any) => x.status !== 'success')) {
+                    console.log(result)
                     throw new Error(`Error getting general token info`)
                 }
-
 
                 const defillamaNetwork = this.connectedNetwork === Network.homestead ? 'ethereum' : this.connectedNetwork
                 const defillamaCoinResult = await getCoins(addressMap.map(x => `${defillamaNetwork}:${x}`))
@@ -734,6 +695,67 @@ export const useCoreStore = defineStore({
             }
 
             return { quote: bestQuote, path: bestPath, pathCallData, priceImpact }
+        },
+        async getPetalexInfo(address: string) {
+            const petalexNftAddress = this.getAddress(Address.petalexNft)
+            if (!petalexNftAddress || !account.connected) {
+                return
+            }
+            const ownedTokens = await readContract({
+                address: petalexNftAddress as `0x${string}`,
+                abi: petalexAbi,
+                functionName: 'getOwnedTokens',
+                args: [address],
+            }) as number[]
+            
+            this.ownedTokens = ownedTokens
+        },
+        async mintProxyWallets(amount: number, donation: bigint) {
+            const petalexNftAddress = this.getAddress(Address.petalexNft)
+            if (!account.connected || !petalexNftAddress) return
+
+            // pick random integers for token ids that might be available
+            // do this randomly so that there's less chance of conflict if multiple people mint at the same time
+            let randomTokenIds = []
+            let i = 0
+            let actualAvailableTokenIds = []
+
+            while(actualAvailableTokenIds.length < amount) {
+                i = 0
+                randomTokenIds = []
+                for (i = 0; i < amount; ++i) {
+                    randomTokenIds.push(getRandomInt())
+                }
+
+                const tokenResult = await multicall({
+                    calls: [
+                        {
+                            abi: petalexAbi,
+                            contractAddress: petalexNftAddress as `0x${string}`,
+                            calls: [...randomTokenIds.map(x => ['isTokenIdAvailable', [x]])] as any[],
+                        },
+                    ]
+                })
+    
+                i = 0
+                for (const r of tokenResult) {
+                    const data = r as any
+                    if (data.status === 'success') {
+                        if (data.result) {
+                            actualAvailableTokenIds.push(randomTokenIds[i])
+                        }
+                    }
+                    ++i
+                }
+            }
+
+            return await writeContract({
+                address: petalexNftAddress as `0x${string}`,
+                abi: petalexAbi,
+                functionName: 'mintBatch',
+                args: [account.address, actualAvailableTokenIds, solidityPacked(['bytes'], ['0x'])],
+                value: donation,
+            })
         },
     },
 })
