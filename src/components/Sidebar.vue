@@ -18,7 +18,17 @@ import ActionsBase from './actions/ActionsBase.vue'
         </div> 
         <div class="drawer-side">
             <label for="my-drawer-2" class="drawer-overlay"></label> 
-            <ul class="menu p-4 w-[250px] h-full bg-base-200 text-base-content">            
+            <ul class="menu p-4 w-[250px] h-full bg-base-200 text-base-content"> 
+                <li class="collapse">
+                    <input type="radio" name="my-accordion-1" /> 
+                    <div class="collapse-title">
+                        Petalex
+                    </div>
+                    <ul class="collapse-content"> 
+                        <li><router-link to="/mint">Mint</router-link></li>
+                        <li><router-link to="/select">Select Proxy</router-link></li>
+                    </ul>
+                </li>           
                 <li class="collapse">
                     <input type="radio" name="my-accordion-1" /> 
                     <div class="collapse-title">

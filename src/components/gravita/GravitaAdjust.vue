@@ -4,11 +4,13 @@ import { Address, GravitaCollateralInfo, useCoreStore } from '../../store/core'
 import { useActionStore } from '../../store/action'
 import { standardiseDecimals, convertFromDecimals } from '../../utils/bn'
 import { watchPausable } from '@vueuse/core'
+import { useGravitaStore } from '../../store/gravita'
 
 const core = useCoreStore()
 const actionStore = useActionStore()
+const gravita = useGravitaStore()
 
-const activeCollaterals = computed(() => core.gravitaCollateralInfo?.filter(x => x.isActive && core.getAggregatedActiveVessels.find(y => y.address === x.address && y.hasVessel)) || [])
+const activeCollaterals = computed(() => gravita.gravitaCollateralInfo?.filter(x => x.isActive && gravita.getAggregatedActiveVessels.find(y => y.address === x.address && y.hasVessel)) || [])
 
 const selectedCollateral: Ref<GravitaCollateralInfo | null> = ref(null)
 const collateralAmount = ref(0)
@@ -82,7 +84,7 @@ const addAction = async () => {
         const coll = convertFromDecimals(collateralAmount.value, selectedCollateral.value.decimals)
         const debt = convertFromDecimals(debtAmount.value, 18)
 
-        const { upperHint, lowerHint } = await core.calculateGravitaHints(selectedCollateral.value.address, coll, debt)
+        const { upperHint, lowerHint } = await gravita.calculateGravitaHints(selectedCollateral.value.address, coll, debt)
         actionStore.spliceAction({
             name: 'GravitaAdjust',
             displayName: 'Adjust Vessel',

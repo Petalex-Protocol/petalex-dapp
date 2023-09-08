@@ -17,24 +17,24 @@ app.use(createWeb3Auth({
         // Chains.mainnet,
         Chains.arbitrum,
         // Chains.optimism,
-        {
+        import.meta.env.MODE === 'development' ? {
             id: 1,
             name: 'Ethereum Devnet',
             network: Chains.mainnet.network,
             nativeCurrency: Chains.mainnet.nativeCurrency,
             rpcUrls: {
                 default: {
-                    http: ['https://rpc.tenderly.co/fork/bf5221c3-8a06-4676-a2e7-b43f5fe38b4e'],
+                    http: [import.meta.env.VITE_TENDERLY_RPC],
                     webSocket: [],
                 },
                 public: {
-                    http: ['https://rpc.tenderly.co/fork/bf5221c3-8a06-4676-a2e7-b43f5fe38b4e'],
+                    http: [import.meta.env.VITE_TENDERLY_RPC],
                     webSocket: [],
                 }
             },
             blockExplorers: Chains.mainnet.blockExplorers,
             contracts: Chains.mainnet.contracts,
-        },
+        } : Chains.mainnet,
     ],
     enableCustomProvider: true,
 }))

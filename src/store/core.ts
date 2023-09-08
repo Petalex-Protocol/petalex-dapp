@@ -1,16 +1,10 @@
 import { defineStore } from "pinia"
 import { erc20ABI, multicall, account, readContract, chain, writeContract } from '@kolirt/vue-web3-auth'
-import adminAbi from '../abi/gravita/admin.json'
-import priceFeedAbi from '../abi/gravita/pricefeed.json'
-import vesselManagerOperationsAbi from '../abi/gravita/vesselmanageroperations.json'
 import uniswapV3FactoryAbi from '../abi/uniswap/uniswapv3factory.json'
 import uniswapQuoterV2Abi from '../abi/uniswap/uniswapquoterv2.json'
-import sortedVesselsAbi from '../abi/gravita/sortedVessels.json'
 import petalexAbi from '../abi/petalex/petalexnft.json'
-import oracleAbi from '../abi/gravita/oracle.json'
 import { getRandomInt } from "../utils/math"
-import { useActionStore } from "./action"
-import { Contract, JsonRpcProvider, solidityPacked } from "ethers"
+import { solidityPacked } from "ethers"
 import { getCoins } from "../utils/defillama_api"
 import { convertFromDecimals, standardiseDecimals } from "../utils/bn"
 
@@ -53,12 +47,11 @@ export interface AddressNetworkMap {
 export interface CoreState {
     addresses: AddressNetworkMap[]
     connectedNetwork: Network
-    gravitaCollateralInfo: GravitaCollateralInfo[]
-    activeVessels: ActiveVessel[]
     availableTokens: Token[]
     tokensToQuery: AddressNetworkMap[]
     uniswapV3FeeTiers: number[]
     ownedTokens: number[]
+    selectedToken: number
 }
 
 export interface ActiveVessel {
@@ -160,8 +153,6 @@ export const useCoreStore = defineStore({
                 },
             ],
             connectedNetwork: Network.homestead,
-            gravitaCollateralInfo: [],
-            activeVessels: [],
             availableTokens: [],
             tokensToQuery: [                
                 {
@@ -237,6 +228,7 @@ export const useCoreStore = defineStore({
             ],
             uniswapV3FeeTiers: [100, 500, 3000, 10000],
             ownedTokens: [],
+            selectedToken: -1,
         } as CoreState),
     getters: {
         getNetworkAddressMap: (state: CoreState): AddressMap[] | undefined => {
@@ -245,287 +237,11 @@ export const useCoreStore = defineStore({
         getAddress: (state: CoreState) => {
             return (name: Address) => state.addresses.find(x => x.network == state.connectedNetwork)?.addresses.find(x => x.name == name)?.address;  
         },
-        getAggregatedActiveVessels: (state: CoreState) => {
-            const actionStore = useActionStore()
-            const openedVessels = actionStore.actions?.filter(x => x.name === 'GravitaOpen') || []
-            return [
-                ...openedVessels.map(x => ({
-                    address: x.calldata[0],
-                    hasVessel: true
-                })),
-                ...state.activeVessels.filter(x => !openedVessels.find(y => y.calldata[0] === x.address))
-            ]
-        },
     },
     actions: {
         setCurrentNetwork(network: Network) {         
             this.connectedNetwork = network
-        },
-        async getGravitaCollateralInfo() {
-            this.gravitaCollateralInfo = []
-            const address = this.getAddress(Address.gravitaAdmin)
-            if (!address || !account.connected) {
-                return
-            }
-
-            // First get all valid collaterals for querying and price feed address
-            let collaterals: string[] = []
-            let priceFeed: string = ''
-
-            const initResult = await multicall({
-                calls: [
-                    {
-                        abi: adminAbi,
-                        contractAddress: address as `0x${string}`,
-                        calls: [                            
-                            ['getValidCollateral', []],
-                            ['priceFeed', []],
-                        ],
-                    },
-                ]
-            })
-            let i = 0
-            for (const r of initResult) {
-                const data = r as any
-                if (data.status === 'success') {
-                    if (i === 0) {
-                        collaterals = data.result
-                    } else {
-                        priceFeed = data.result
-                    }
-                } else {
-                    throw new Error(`Error getting init info: ${data}`)
-                }
-                ++i
-            }
-
-            // Use multicall3 to group the info into as few rpc calls as possible
-            const calls: [string, Array<any>?][] = []
-            const collateralCalls: any[] = []
-            const priceFeedCalls: any[] = []
-            const infos: GravitaCollateralInfo[] = []
-            for (const collateral of collaterals) {
-                calls.push(['getMintCap', [collateral]])
-                calls.push(['getMinNetDebt', [collateral]])
-                calls.push(['getTotalAssetDebt', [collateral]])
-                calls.push(['getIsActive', [collateral]])
-                calls.push(['getMcr', [collateral]])
-                calls.push(['getCcr', [collateral]])
-                infos.push({
-                    mintCap: '0',
-                    minNetDebt: '0',
-                    totalAssetDebt: '0',
-                    address: collateral,
-                    name: '',
-                    decimals: 18,
-                    balanceOf: '0',
-                    symbol: '',
-                    isActive: false,
-                    minCollateralRatio: '0',
-                    recoveryCollateralRadio: '0',
-                    priceFeed: '',
-                    price: '0',
-                    priceDecimals: '8',
-                    isPriceEthIndexed: false,
-                })
-                collateralCalls.push({
-                    abi: erc20ABI,
-                    contractAddress: collateral as `0x${string}`,
-                    calls: [
-                        ['name', []],
-                        ['symbol', []],
-                        ['decimals', []],
-                        ['balanceOf', [account.address]]
-                    ],
-                })
-                priceFeedCalls.push({
-                    abi: priceFeedAbi,
-                    contractAddress: priceFeed as `0x${string}`,
-                    calls: [
-                        ['oracles', [collateral]],
-                    ],
-                })
-            }
-
-            const result = await multicall({
-                calls: [
-                    {
-                        abi: adminAbi,
-                        contractAddress: address as `0x${string}`,
-                        calls,
-                    },
-                    ...collateralCalls,
-                    ...priceFeedCalls,
-                ]
-            })
-
-            // Parse the results into the info objects
-            i = 0
-            let j = 1
-            let k = 0
-            let adminMod = 6 // number of admin contract calls
-            let ercMod = 4 // number of erc20 calls
-            let priceFeedMod = 1 // number of price feed calls
-            let adminCalls = true
-            let processingCollateralCalls = false
-            let processingPriceFeedCalls = false
-
-            for (const r of result) {
-                const data = r as any
-                const info = infos[i]
-                
-                if (adminCalls) {
-                    if (data.status === 'success') {
-                        switch (j) {    
-                            case 1:
-                                info.mintCap = data.result.toString()
-                                break
-                            case 2:
-                                info.minNetDebt = data.result.toString()
-                                break
-                            case 3:
-                                info.totalAssetDebt = data.result.toString()
-                                break
-                            case 4:
-                                info.isActive = data.result
-                                break
-                            case 5:
-                                info.minCollateralRatio = data.result.toString()
-                                break
-                            case 6:
-                                info.recoveryCollateralRadio = data.result.toString()
-                                break
-                        }
-                    } else {
-                        throw new Error(`Error getting admin info: ${data}`)
-                    }
-                } else if (processingCollateralCalls) {
-                    if (data.status === 'success') {
-                        switch (j) {
-                            case 1:
-                                info.name = data.result.toString()
-                                break
-                            case 2:
-                                info.symbol = data.result.toString()
-                                break
-                            case 3:
-                                info.decimals = data.result
-                                break
-                            case 4:
-                                info.balanceOf = data.result.toString()
-                                break
-                        }
-                    } else {
-                        throw new Error(`Error getting collateral info: ${data}`)
-                    }
-                } else {
-                    if (data.status === 'success') {
-                        const oracleResult = data.result as Array<any>
-                        // 0 = price feed address, 1 = provider type, 2 = timeout (seconds), 3 = decimals, 4 = is eth indexed
-                        switch (j) {
-                            case 1:
-                                info.priceFeed = oracleResult[0].toString()
-                                info.priceDecimals = oracleResult[3].toString()
-                                info.isPriceEthIndexed = oracleResult[4]
-                                break
-                        }
-                    } else {
-                        // no price feed for this collateral so don't throw as it might just be inactive
-                    }
-                }
-                if ((adminCalls && (j % adminMod === 0)) || (processingCollateralCalls && (j % ercMod === 0)) || (processingPriceFeedCalls && (j % priceFeedMod === 0))) {
-                    ++i
-                    j = 0
-                }                
-                ++k
-                ++j
-                if (k === calls.length) {
-                    adminCalls = false
-                    processingCollateralCalls = true
-                    i = 0
-                }
-                if (k === calls.length + (collateralCalls.length * ercMod)) {
-                    processingCollateralCalls = false
-                    processingPriceFeedCalls = true
-                    i = 0
-                }
-            }
-
-            // Get the price for each collateral
-            const priceResult = await multicall({
-                calls: infos.filter(x => x.priceFeed).map(x => ({
-                        abi: oracleAbi,
-                        contractAddress: x.priceFeed as `0x${string}`,
-                        calls: [                            
-                            ['latestRoundData', []],
-                        ],
-                    })
-                )
-            })
-            i = 0
-            for (const r of priceResult) {
-                const data = r as any
-                while (infos[i].priceFeed === '') {
-                    ++i
-                }
-                const info = infos[i]
-                if (data.status === 'success') {
-                    const oracleResult = data.result as Array<any>
-                    // 0 = roundId, 1 = answer, 2 = startedAt, 3 = updatedAt, 4 = answeredInRound
-                    info.price = oracleResult[1].toString()
-                } else {
-                    // no price feed for this collateral so don't throw as it might just be inactive
-                }
-                ++i
-            }
-
-            this.gravitaCollateralInfo = infos
-        },
-        async calculateGravitaHints(collateralAddress: string, coll: bigint, debt: bigint) {
-            const sortedVesselsAddress = this.getAddress(Address.gravitaSortedVessels)
-            const vesselManagerOperationsAddress = this.getAddress(Address.gravitaVesselManagerOperations)
-            const result = await multicall({
-                calls: [
-                    {
-                        abi: sortedVesselsAbi,
-                        contractAddress: sortedVesselsAddress as `0x${string}`,
-                        calls: [
-                            ['getSize', [collateralAddress]],
-                        ],
-                    },
-                    {
-                        abi: vesselManagerOperationsAbi,
-                        contractAddress: vesselManagerOperationsAddress as `0x${string}`,
-                        calls: [
-                            ['computeNominalCR', [coll, debt]],
-                        ],
-                    },
-                ]
-            })
-
-            const sortedVesselsResult = result[0] as any
-            const vesselManagerOperationsResult = result[1] as any
-            if (sortedVesselsResult.status !== 'success' || vesselManagerOperationsResult.status !== 'success') {
-                console.error(result)
-                throw new Error(`Error getting sorted vessels info`)
-            }
-
-            const hintResult = await readContract({
-                address: vesselManagerOperationsAddress as `0x${string}`,
-                abi: vesselManagerOperationsAbi,
-                functionName: 'getApproxHint',
-                args: [collateralAddress, vesselManagerOperationsResult.result, sortedVesselsResult.result * BigInt(15), getRandomInt()],
-            })
-
-            const insertPositionResult = await readContract({
-                address: sortedVesselsAddress as `0x${string}`,
-                abi: sortedVesselsAbi,
-                functionName: 'findInsertPosition',
-                args: [collateralAddress, vesselManagerOperationsResult.result, hintResult[0], hintResult[0]],
-            })
-
-            return { upperHint: insertPositionResult[0], lowerHint: insertPositionResult[1] }
-        },
+        },        
         async getBalances(addresses: string[]) {
             if (!account.connected || addresses.length === 0) {
                 return []
@@ -547,10 +263,6 @@ export const useCoreStore = defineStore({
                 throw new Error(`Error getting balances`)
             }
             return result.map((x: any) => x.result.toString())
-        },
-        async getActiveVessels() {
-            // TODO: get proxy address from petalex nft and query gravita vessel manager for all collaterals
-            this.activeVessels = this.gravitaCollateralInfo.map(x => ({ address: x.address, hasVessel: false } as ActiveVessel))
         },
         async getPoolAddress(token0: Token, token1: Token, fee: number) {
             return await readContract({
@@ -604,8 +316,6 @@ export const useCoreStore = defineStore({
             }
         },
         async getUniswapV3Quote(token0: Token, token1: Token, amount: number, input: boolean, intermediateTokens: Token[] = []) {
-            const provider = new JsonRpcProvider(chain.value.rpcUrls.default.http[0])
-            const c = new Contract(this.getAddress(Address.uniswapQuoterV2) as string, uniswapQuoterV2Abi, provider) as any
             let bestQuote: bigint = BigInt(0)
             let bestPath: any[] = []
             let pathCallData: string = ''
@@ -709,6 +419,7 @@ export const useCoreStore = defineStore({
             }) as number[]
             
             this.ownedTokens = ownedTokens
+            this.selectedToken = ownedTokens[0]
         },
         async mintProxyWallets(amount: number, donation: bigint) {
             const petalexNftAddress = this.getAddress(Address.petalexNft)
@@ -756,6 +467,9 @@ export const useCoreStore = defineStore({
                 args: [account.address, actualAvailableTokenIds, solidityPacked(['bytes'], ['0x'])],
                 value: donation,
             })
+        },
+        selectToken(tokenId: number) {
+            this.selectedToken = tokenId
         },
     },
 })

@@ -4,11 +4,13 @@ import { useCoreStore, Address } from '../../store/core'
 import NetworkUnsupported from '../common/NetworkUnsupported.vue'
 import { chain, account } from '@kolirt/vue-web3-auth'
 import { standardiseDecimals } from '../../utils/bn'
+import { useGravitaStore } from '../../store/gravita'
 
 const core = useCoreStore()
+const gravita = useGravitaStore()
 const adminAddress = computed(() => core.getAddress(Address.gravitaAdmin))
 
-const activeCollaterals = computed(() => core.gravitaCollateralInfo?.filter(x => x.isActive) || [])
+const activeCollaterals = computed(() => gravita.gravitaCollateralInfo?.filter(x => x.isActive) || [])
 const loading = ref(false)
 
 const init = async () => {
@@ -16,8 +18,8 @@ const init = async () => {
         try {
             if (account.connected) {
                 loading.value = true
-                await core.getGravitaCollateralInfo()
-                await core.getActiveVessels()
+                await gravita.getGravitaCollateralInfo()
+                await gravita.getActiveVessels()
             }
         } catch (error) {
             console.log(error)

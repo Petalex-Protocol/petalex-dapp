@@ -1,10 +1,24 @@
 import { createRouter, createWebHistory, RouteRecordRaw } from "vue-router"
 
+declare module "vue-router" {
+    interface RouteMeta {
+        requiresMint?: boolean
+    }
+}
+
 const routes: Array<RouteRecordRaw> = [
     {
         path: "/",
         component: () => import("../components/petalex/PetalexBase.vue"),
         children: [
+            {
+                path: "mint",
+                component: () => import("../components/petalex/PetalexMint.vue"),
+            },
+            {
+                path: "select",
+                component: () => import("../components/petalex/PetalexSelect.vue"),
+            },
             {
                 path: "gravita",
                 component: () => import("../components/gravita/GravitaBase.vue"),
@@ -22,6 +36,9 @@ const routes: Array<RouteRecordRaw> = [
                         component: () => import("../components/gravita/GravitaClose.vue"),
                     }
                 ],
+                meta: {
+                    requiresMint: true
+                }
             },
             {
                 path: "liquity",
@@ -40,6 +57,9 @@ const routes: Array<RouteRecordRaw> = [
                         component: () => import("../components/liquity/LiquityClose.vue"),
                     }
                 ],
+                meta: {
+                    requiresMint: true
+                }
             },
             {
                 path: "utilities",
@@ -54,6 +74,9 @@ const routes: Array<RouteRecordRaw> = [
                         component: () => import("../components/utilities/UtilitiesExchange.vue"),
                     },
                 ],
+                meta: {
+                    requiresMint: true
+                }
             },
         ],
     },    
