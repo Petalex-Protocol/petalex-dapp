@@ -59,6 +59,8 @@ import ActionsBase from './actions/ActionsBase.vue'
                     <ul class="collapse-content"> 
                         <li><router-link to="/utilities/flash">Flash Loan</router-link></li>
                         <li><router-link to="/utilities/exchange">Exchange</router-link></li>
+                        <li><router-link to="/utilities/wrap">Wrap</router-link></li>
+                        <li><router-link to="/utilities/unwrap">Unwrap</router-link></li>
                     </ul>
                 </li>
             </ul>

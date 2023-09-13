@@ -73,6 +73,14 @@ const routes: Array<RouteRecordRaw> = [
                         path: "exchange",
                         component: () => import("../components/utilities/UtilitiesExchange.vue"),
                     },
+                    {
+                        path: "wrap",
+                        component: () => import("../components/utilities/UtilitiesWrap.vue"),
+                    },
+                    {
+                        path: "unwrap",
+                        component: () => import("../components/utilities/UtilitiesUnwrap.vue"),
+                    },
                 ],
                 meta: {
                     requiresMint: true

@@ -1,5 +1,5 @@
 import { defineStore } from "pinia"
-import { erc20ABI, multicall, account, readContract, chain, writeContract } from '@kolirt/vue-web3-auth'
+import { erc20ABI, multicall, account, readContract, writeContract, fetchBalance, chain } from '@kolirt/vue-web3-auth'
 import uniswapV3FactoryAbi from '../abi/uniswap/uniswapv3factory.json'
 import uniswapQuoterV2Abi from '../abi/uniswap/uniswapquoterv2.json'
 import petalexAbi from '../abi/petalex/petalexnft.json'
@@ -7,6 +7,8 @@ import { getRandomInt } from "../utils/math"
 import { solidityPacked } from "ethers"
 import { getCoins } from "../utils/defillama_api"
 import { convertFromDecimals, standardiseDecimals } from "../utils/bn"
+
+export const NATIVE_ADDRESS = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE'
 
 export enum Network {
     // goerli = "goerli",
@@ -63,7 +65,6 @@ export interface GravitaCollateralInfo extends Token {
     mintCap: string
     minNetDebt: string
     totalAssetDebt: string
-    balanceOf: string
     isActive: boolean
     minCollateralRatio: string
     recoveryCollateralRadio: string
@@ -78,6 +79,7 @@ export interface Token {
     symbol: string
     decimals: number
     price: string
+    balanceOf: string
 }
 
 export const useCoreStore = defineStore({
@@ -90,11 +92,11 @@ export const useCoreStore = defineStore({
                     addresses: [
                         {
                             name: Address.petalexNft,
-                            address: "0xc550A4f27991a934EEdEc1bb7de29d2ae1047619",
+                            address: "0xF583a59c59F8dF885e118736E8ED2E7b3e25A671",
                         },
                         {
                             name: Address.actionExecutor,
-                            address: "0x5D3c1eeC1Ed7614886D7076caBaA6219B6175129",
+                            address: "0x0bd0C23B9AAdb4af399F812B18Ff5619f7507Cfa",
                         },
                         {
                             name: Address.gravitaAdmin,
@@ -264,6 +266,14 @@ export const useCoreStore = defineStore({
             }
             return result.map((x: any) => x.result.toString())
         },
+        async getNativeBalance() {
+            if (!account.connected) {
+                return
+            }
+
+            const balance = await fetchBalance({ address: account.address as `0x${string}` })
+            return balance
+        },
         async getPoolAddress(token0: Token, token1: Token, fee: number) {
             return await readContract({
                 address: this.getAddress(Address.uniswapV3Factory) as `0x${string}`,
@@ -285,6 +295,7 @@ export const useCoreStore = defineStore({
                                 ['name', []],
                                 ['symbol', []],
                                 ['decimals', []],
+                                ['balanceOf', [account.address]],
                             ],
                         })) as any[],
                     ]
@@ -308,9 +319,19 @@ export const useCoreStore = defineStore({
                         symbol: (result[i + 1] as any).result,
                         decimals: (result[i + 2] as any).result,
                         price: defillamaCoinResult.coins[`${defillamaNetwork}:${a}`]?.price?.toString() || '0',
+                        balanceOf: (result[i + 3] as any).result,
                     })
-                    i += 3
+                    i += 4
                 }
+
+                const balance = await fetchBalance({ address: account.address as `0x${string}` })
+                tempAvailableTokens.push({
+                    address: NATIVE_ADDRESS, // special address for native token
+                    name: chain.value.name,
+                    price: defillamaCoinResult.coins[`coingecko:${chain.value.name.toLowerCase()}`]?.price?.toString() || '0',
+                    balanceOf: balance.value.toString(),
+                    ...balance,
+                })
 
                 this.availableTokens = tempAvailableTokens
             }

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, watch, ref, Ref, onMounted } from 'vue'
 import { useActionStore } from '../../store/action'
-import { useCoreStore } from '../../store/core'
+import { useCoreStore, NATIVE_ADDRESS } from '../../store/core'
 import { standardiseDecimals } from '../../utils/bn';
 
 const actions = useActionStore()
@@ -13,16 +13,24 @@ const calculateBalances = async () => {
     if (missingBalances.value?.length > 0) {
         loading.value = true
         try {
-            const newBalances = await core.getBalances(missingBalances.value.map(b => b.address))
+            const filteredBalances = missingBalances.value.filter(x => x.address !== NATIVE_ADDRESS)
+            const newBalances = await core.getBalances(filteredBalances.map(b => b.address))
             const balanceMap = []
             let i = 0
             let j = 0
-            for (i; i < missingBalances.value.length; i++) {
+            for (i; i < filteredBalances.length; i++) {
                 balanceMap.push({
-                    symbol: missingBalances.value[i].symbol,
+                    symbol: filteredBalances[i].symbol,
                     amount: standardiseDecimals(newBalances[j], newBalances[j + 1])
                 })
                 j += 2
+            }
+            const nativeBalance = await core.getNativeBalance()
+            if (nativeBalance) {
+                balanceMap.push({
+                    symbol: nativeBalance.symbol,
+                    amount: standardiseDecimals(nativeBalance.value, nativeBalance.decimals)
+                })
             }
             balances.value = balanceMap
         } catch (e) {
@@ -35,7 +43,7 @@ const calculateBalances = async () => {
 
 watch(() => actions.actions.length, calculateBalances)
 
-const missingBalances = computed(() => {    
+const missingBalances = computed(() => {   
     return actions.getBalances.filter(x => x.amount < 0).map(x => {
         const balance = balances.value.find(b => b.symbol === x.symbol)
         return {
@@ -43,7 +51,7 @@ const missingBalances = computed(() => {
             address: x.address,
             amount: (balance?.amount ?? 0) + x.amount
         }
-    })
+    }).filter(x => x.amount < 0)
 })
 
 onMounted(calculateBalances)
