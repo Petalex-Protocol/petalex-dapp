@@ -1,15 +1,22 @@
 import { defineStore } from "pinia"
 
+export enum Location {
+    proxy,
+    wallet,
+}
+
 export interface BalanceChange {
     symbol: string
     address: string
     amount: number
+    location: Location
 }
 
 export interface Action {
     name: string
     displayName: string
     calldata: any[]
+    value?: bigint
     balanceChanges: BalanceChange[]
 }
 
@@ -31,7 +38,7 @@ export const useActionStore = defineStore({
             const balances: BalanceChange[] = []
             for (const action of state.actions) {
                 for (const balanceChange of action.balanceChanges) {
-                    const index = balances.findIndex((b) => b.symbol === balanceChange.symbol)
+                    const index = balances.findIndex((b) => b.symbol === balanceChange.symbol && b.location === balanceChange.location)
                     if (index === -1) {
                         balances.push({
                             ...balanceChange // copy to not affect calculations

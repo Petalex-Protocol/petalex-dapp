@@ -113,6 +113,7 @@ export const useGravitaStore = defineStore({
                     name: '',
                     decimals: 18,
                     balanceOf: '0',
+                    balanceOfProxy: '0',
                     symbol: '',
                     isActive: false,
                     minCollateralRatio: '0',

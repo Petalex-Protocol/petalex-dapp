@@ -19,9 +19,8 @@ const loading = ref(false)
 const init = async () => {
     if (!loading.value) {
         try {
-            if (account.connected && account.address) {
+            if (account.connected) {
                 loading.value = true
-                await core.getPetalexInfo(account.address)
                 if (route.meta.requiresMint && core.ownedTokens.length === 0) {
                     router.push('/mint')
                 }

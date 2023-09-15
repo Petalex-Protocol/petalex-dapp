@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useCoreStore, Token } from '../../store/core'
-import { useActionStore } from '../../store/action'
+import { useCoreStore, Token, NATIVE_ADDRESS } from '../../store/core'
+import { Location, useActionStore } from '../../store/action'
 import { convertFromDecimals, standardiseDecimals } from '../../utils/bn'
 import { useDebounceFn } from '@vueuse/core'
 
@@ -9,12 +9,12 @@ const core = useCoreStore()
 const actionStore = useActionStore()
 
 const loading = ref(false)
-const token0 = ref<Token>({ address: '', name: '', symbol: '', decimals: 18, price: '0' })
-const token1 = ref<Token>({ address: '', name: '', symbol: '', decimals: 18, price: '0' })
+const token0 = ref<Token>({ address: '', name: '', symbol: '', decimals: 18, price: '0', balanceOf: '0', balanceOfProxy: '0' })
+const token1 = ref<Token>({ address: '', name: '', symbol: '', decimals: 18, price: '0', balanceOf: '0', balanceOfProxy: '0' })
 const intermediateTokens = ref<Token[]>([])
 const amount0 = ref(0)
 const amount1 = ref(0)
-const tokens = computed(() => core.availableTokens)
+const tokens = computed(() => core.availableTokens.filter(x => x.address !== NATIVE_ADDRESS))
 const chosenPath = ref<any[]>([])
 const chosenPathCallData = ref<string>('')
 const bestPriceImpact = ref(0)
@@ -73,10 +73,12 @@ const addAction = async () => {
                 symbol: token0.value.symbol,
                 address: token0.value.address,
                 amount: amount0.value * -1,
+                location: Location.proxy,
             }, {
                 symbol: token1.value.symbol,
                 address: token1.value.address,
                 amount: amount1.value,
+                location: Location.proxy,
             }],
         }, actionStore.actions.length)
     } finally {
@@ -85,7 +87,7 @@ const addAction = async () => {
 }
 
 const addHop = () => {
-    intermediateTokens.value.push({ address: '', name: '', symbol: '', decimals: 18, price: '0' })
+    intermediateTokens.value.push({ address: '', name: '', symbol: '', decimals: 18, price: '0', balanceOf: '0', balanceOfProxy: '0' })
 }
 </script>
 

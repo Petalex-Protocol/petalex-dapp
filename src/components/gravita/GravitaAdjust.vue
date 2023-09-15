@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch, Ref, nextTick} from 'vue'
 import { Address, GravitaCollateralInfo, useCoreStore } from '../../store/core'
-import { useActionStore } from '../../store/action'
+import { Location, useActionStore } from '../../store/action'
 import { standardiseDecimals, convertFromDecimals } from '../../utils/bn'
 import { watchPausable } from '@vueuse/core'
 import { useGravitaStore } from '../../store/gravita'
@@ -93,10 +93,12 @@ const addAction = async () => {
                 symbol: selectedCollateral.value.symbol,
                 address: selectedCollateral.value.address,
                 amount: collateralAmount.value * -1,
+                location: Location.proxy,
             }, {
                 symbol: 'GRAI',
                 address: core.getAddress(Address.gravitaDebtToken) as string,
                 amount: debtAmount.value,
+                location: Location.proxy,
             }],
         }, actionStore.getActions.length)
     } finally {

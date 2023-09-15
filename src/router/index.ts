@@ -81,6 +81,14 @@ const routes: Array<RouteRecordRaw> = [
                         path: "unwrap",
                         component: () => import("../components/utilities/UtilitiesUnwrap.vue"),
                     },
+                    {
+                        path: "pull",
+                        component: () => import("../components/utilities/UtilitiesPull.vue"),
+                    },
+                    {
+                        path: "send",
+                        component: () => import("../components/utilities/UtilitiesSend.vue"),
+                    },
                 ],
                 meta: {
                     requiresMint: true

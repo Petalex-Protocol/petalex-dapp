@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, Ref } from 'vue'
 import { useCoreStore, Token } from '../../store/core'
-import { useActionStore } from '../../store/action'
+import { Location, useActionStore } from '../../store/action'
 import { convertFromDecimals } from '../../utils/bn'
 
 const core = useCoreStore()
@@ -10,8 +10,8 @@ const actionStore = useActionStore()
 const feeOptions = [100, 500, 3000, 10000]
 
 const loading = ref(false)
-const token0: Ref<Token> = ref({ address: '', name: '', symbol: '', decimals: 18 })
-const token1: Ref<Token> = ref({ address: '', name: '', symbol: '', decimals: 18 })
+const token0: Ref<Token> = ref({ address: '', name: '', symbol: '', decimals: 18, price: '0', balanceOf: '0', balanceOfProxy: '0' })
+const token1: Ref<Token> = ref({ address: '', name: '', symbol: '', decimals: 18, price: '0', balanceOf: '0', balanceOfProxy: '0' })
 const amount0 = ref(0)
 const amount1 = ref(0)
 const fee = ref(3000)
@@ -41,10 +41,12 @@ const addAction = async () => {
                 symbol: token0.value.symbol,
                 address: token0.value.address,
                 amount: amount0.value,
+                location: Location.proxy,
             }, {
                 symbol: token1.value.symbol,
                 address: token1.value.address,
                 amount: amount1.value,
+                location: Location.proxy,
             }],
         }, 0) // always the first index
 
@@ -57,10 +59,12 @@ const addAction = async () => {
                 symbol: token0.value.symbol,
                 address: token0.value.address,
                 amount: (amount0.value + (amount0.value * (fee.value / 1000000))) * -1,
+                location: Location.proxy,
             }, {
                 symbol: token1.value.symbol,
                 address: token1.value.address,
                 amount: (amount1.value + (amount1.value * (fee.value / 1000000))) * -1,
+                location: Location.proxy,
             }],
         }, actionStore.actions.length) // always the last index
     } finally {

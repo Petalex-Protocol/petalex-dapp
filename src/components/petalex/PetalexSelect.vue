@@ -1,13 +1,19 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useCoreStore } from '../../store/core'
 
 const core = useCoreStore()
 const ownedTokens = computed(() => core.ownedTokens || [])
 const selectedToken = computed(() => core.selectedToken)
+const loading = ref(false)
 
-const select = (tokenId: number) => {
-    core.selectToken(tokenId)
+const select = async (tokenId: number) => {
+    loading.value = true
+    try {
+        await core.selectToken(tokenId)
+    } finally {
+        loading.value = false
+    }
 }
 </script>
 
@@ -30,8 +36,8 @@ const select = (tokenId: number) => {
                         </div>
                         <div class="flex-grow"></div>
                         <div class="flex flex-col">
-                            <button v-if="t !== selectedToken" class="btn btn-primary" @click="select(t)">Select</button>
-                            <button v-else class="btn btn-primary" disabled>Active</button>
+                            <button v-if="t !== selectedToken" class="btn btn-primary"  :disabled="loading" @click="select(t)">Select <span v-if="loading" class="loading loading-spinner"></span></button>
+                            <button v-else class="btn btn-primary" disabled>Active <span v-if="loading" class="loading loading-spinner"></span></button>
                         </div>
                     </div>
                 </div>

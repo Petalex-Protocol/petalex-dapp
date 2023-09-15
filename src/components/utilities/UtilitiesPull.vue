@@ -1,16 +1,17 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useCoreStore } from '../../store/core'
+import { Token, useCoreStore } from '../../store/core'
 import { Location, useActionStore } from '../../store/action'
 import { convertFromDecimals, standardiseDecimals } from '../../utils/bn';
+import { account } from '@kolirt/vue-web3-auth';
 
 const core = useCoreStore()
 const actionStore = useActionStore()
 
 const loading = ref(false)
 const amount = ref(0)
-const wethToken = computed(() => core.availableTokens.find(x => x.symbol === 'WETH') || null)
-const ethToken = computed(() => core.availableTokens.find(x => x.symbol === 'ETH') || null)
+const token = ref<Token>({ address: '', name: '', symbol: '', decimals: 18, price: '0', balanceOf: '0', balanceOfProxy: '0' })
+const tokens = computed(() => core.availableTokens)
 
 const error = computed(() => {
     if (amount.value === 0) return 'Must specify an amount'
@@ -20,22 +21,22 @@ const error = computed(() => {
 const addAction = async () => {
     amount.value = Number(amount.value)
     if (amount.value === 0) return
-    if (!wethToken.value || !ethToken.value) return
+    if (token.value.address === '') return
     loading.value = true
     try {
         actionStore.spliceAction({
-            name: 'Unwrap',
-            displayName: 'Unwrap',
-            // amount
-            calldata: [convertFromDecimals(amount.value, wethToken.value.decimals)],
+            name: 'Pull',
+            displayName: 'Pull',
+            // token, from address, amount
+            calldata: [token.value.address, account.address, convertFromDecimals(amount.value, token.value.decimals)],
             balanceChanges: [{
-                symbol: wethToken.value?.symbol,
-                address: wethToken.value.address,
+                symbol: token.value?.symbol,
+                address: token.value.address,
                 amount: amount.value * -1,
-                location: Location.proxy,
+                location: Location.wallet,
             }, {
-                symbol: ethToken.value.symbol,
-                address: ethToken.value.address,
+                symbol: token.value.symbol,
+                address: token.value.address,
                 amount: amount.value,
                 location: Location.proxy,
             }],
@@ -49,14 +50,19 @@ const addAction = async () => {
 <template>
     <div class="card w-[500px] bg-base-200 shadow-xl mx-auto">
         <div class="card-body">
-            <h2 class="card-title">Unwrap</h2>
+            <h2 class="card-title">Transfer to Proxy</h2>
+            <p class="text">Send funds to your proxy wallet for it to use</p>
             <div class="join">
                 <input class="input input-bordered join-item w-full" v-model="amount" />
-                <input class="input input-bordered join-item w-[80px]" disabled value="WETH" />
+                <select class="select select-bordered join-item" v-model="token">
+                    <option v-for="token in tokens" :key="token.address" :value="token">
+                        {{ token.symbol }}
+                    </option>
+                </select>
             </div>
             <label class="label">
                 <span class="label-text-alt"></span>
-                <span class="label-text-alt cursor-pointer" @click="amount = standardiseDecimals(wethToken?.balanceOf, wethToken?.decimals || 18)">Available: {{ standardiseDecimals(wethToken?.balanceOf, wethToken?.decimals || 18).toFixed(2) }} {{ wethToken?.symbol }}</span>
+                <span class="label-text-alt cursor-pointer" @click="amount = standardiseDecimals(token?.balanceOf, token?.decimals || 18)">Available: {{ standardiseDecimals(token?.balanceOf, token?.decimals || 18).toFixed(2) }} {{ token?.symbol }}</span>
             </label>
             <label v-if="error" class="label error">
                 <span class="label-text-alt"></span>

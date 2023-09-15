@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useCoreStore } from '../../store/core'
-import { useActionStore } from '../../store/action'
+import { Location, useActionStore } from '../../store/action'
 import { convertFromDecimals, standardiseDecimals } from '../../utils/bn';
 
 const core = useCoreStore()
@@ -32,10 +32,12 @@ const addAction = async () => {
                 symbol: ethToken.value?.symbol,
                 address: ethToken.value.address,
                 amount: amount.value * -1,
+                location: Location.proxy,
             }, {
                 symbol: wethToken.value.symbol,
                 address: wethToken.value.address,
                 amount: amount.value,
+                location: Location.proxy,
             }],
         }, actionStore.actions.length)
     } finally {

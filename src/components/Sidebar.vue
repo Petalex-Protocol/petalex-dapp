@@ -1,14 +1,46 @@
 <script setup lang="ts">
 import ActionsBase from './actions/ActionsBase.vue'
+import { onMounted, ref, watch } from 'vue'
+import { useCoreStore } from '../store/core'
+import { chain, account } from '@kolirt/vue-web3-auth'
+
+const core = useCoreStore()
+
+const loading = ref(false)
+
+const init = async () => {
+    if (!loading.value) {
+        try {
+            if (account.connected && account.address) {
+                loading.value = true
+                if (core.selectedProxyAddress === '') {
+                    await core.getPetalexInfo(account.address)
+                }
+                await core.getGeneralTokenInfo()
+            }
+        } catch (error) {
+            console.log(error)
+        } finally {
+            loading.value = false
+        }
+    }
+}
+
+watch([chain, account], init)
+
+onMounted(init)
 </script>
 
 <template>
     <div class="drawer md:drawer-open">
         <input id="my-drawer-2" type="checkbox" class="drawer-toggle" />
         <div class="drawer-content">
-            <div class="flex flex-col justify-between h-full">
+            <div v-if="!loading" class="flex flex-col justify-between h-full">
                 <RouterView class="p-4" />
                 <ActionsBase />
+            </div>
+            <div v-else class="w-full text-center">
+                <span class="loading loading-spinner text-primary loading-md "></span>
             </div>
             <label for="my-drawer-2" class="btn btn-circle btn-primary drawer-button xs:hidden fixed top-[50%] left-[-25px]">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
@@ -61,6 +93,8 @@ import ActionsBase from './actions/ActionsBase.vue'
                         <li><router-link to="/utilities/exchange">Exchange</router-link></li>
                         <li><router-link to="/utilities/wrap">Wrap</router-link></li>
                         <li><router-link to="/utilities/unwrap">Unwrap</router-link></li>
+                        <li><router-link to="/utilities/pull">Transfer to Proxy</router-link></li>
+                        <li><router-link to="/utilities/send">Transfer from Proxy</router-link></li>
                     </ul>
                 </li>
             </ul>

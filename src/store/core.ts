@@ -5,7 +5,7 @@ import uniswapQuoterV2Abi from '../abi/uniswap/uniswapquoterv2.json'
 import petalexAbi from '../abi/petalex/petalexnft.json'
 import { getRandomInt } from "../utils/math"
 import { solidityPacked } from "ethers"
-import { getCoins } from "../utils/defillama_api"
+import { CoinResult, getCoins } from "../utils/defillama_api"
 import { convertFromDecimals, standardiseDecimals } from "../utils/bn"
 
 export const NATIVE_ADDRESS = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE'
@@ -54,6 +54,7 @@ export interface CoreState {
     uniswapV3FeeTiers: number[]
     ownedTokens: number[]
     selectedToken: number
+    selectedProxyAddress: string
 }
 
 export interface ActiveVessel {
@@ -80,6 +81,7 @@ export interface Token {
     decimals: number
     price: string
     balanceOf: string
+    balanceOfProxy: string
 }
 
 export const useCoreStore = defineStore({
@@ -231,6 +233,7 @@ export const useCoreStore = defineStore({
             uniswapV3FeeTiers: [100, 500, 3000, 10000],
             ownedTokens: [],
             selectedToken: -1,
+            selectedProxyAddress: '',
         } as CoreState),
     getters: {
         getNetworkAddressMap: (state: CoreState): AddressMap[] | undefined => {
@@ -266,14 +269,6 @@ export const useCoreStore = defineStore({
             }
             return result.map((x: any) => x.result.toString())
         },
-        async getNativeBalance() {
-            if (!account.connected) {
-                return
-            }
-
-            const balance = await fetchBalance({ address: account.address as `0x${string}` })
-            return balance
-        },
         async getPoolAddress(token0: Token, token1: Token, fee: number) {
             return await readContract({
                 address: this.getAddress(Address.uniswapV3Factory) as `0x${string}`,
@@ -283,35 +278,50 @@ export const useCoreStore = defineStore({
             })
         },
         async getGeneralTokenInfo() {
+            const petalexNftAddress = this.getAddress(Address.petalexNft)
+            if (!petalexNftAddress || !account.connected || this.ownedTokens.length === 0 || this.selectedToken === -1) {
+                return
+            }
+
             const addressMap = this.tokensToQuery.find(x => x.network === this.connectedNetwork)?.addresses.map(x => x.address)
 
             if (addressMap && addressMap.length > 0) {
-                const result = await multicall({
+                const promises = []
+
+                const calls =  [
+                    ['name', []],
+                    ['symbol', []],
+                    ['decimals', []],
+                    ['balanceOf', [account.address]],
+                    ['balanceOf', [this.selectedProxyAddress]]
+                ]
+                promises.push(multicall({
                     calls: [
                         ...addressMap.map((x: string) => ({
                             abi: erc20ABI,
                             contractAddress: x as `0x${string}`,
-                            calls: [
-                                ['name', []],
-                                ['symbol', []],
-                                ['decimals', []],
-                                ['balanceOf', [account.address]],
-                            ],
+                            calls: calls,
                         })) as any[],
                     ]
-                })
+                }))
+                const defillamaNetwork = this.connectedNetwork === Network.homestead ? 'ethereum' : this.connectedNetwork
+                promises.push(getCoins(addressMap.map(x => `${defillamaNetwork}:${x}`)))
+                promises.push(fetchBalance({ address: account.address as `0x${string}` }))
+                promises.push(fetchBalance({ address: this.selectedProxyAddress as `0x${string}` }))
 
+                const promiseResult = await Promise.all(promises)
+
+                const result = promiseResult[0] as unknown[]
                 if (result.some((x: any) => x.status !== 'success')) {
                     console.log(result)
                     throw new Error(`Error getting general token info`)
                 }
-
-                const defillamaNetwork = this.connectedNetwork === Network.homestead ? 'ethereum' : this.connectedNetwork
-                const defillamaCoinResult = await getCoins(addressMap.map(x => `${defillamaNetwork}:${x}`))
-
+                
+                const defillamaCoinResult = promiseResult[1] as CoinResult
                 const tempAvailableTokens: Token[] = []
 
                 let i = 0
+                let increment = calls.length
                 for (const a of addressMap) {
                     tempAvailableTokens.push({
                         address: a,
@@ -320,16 +330,19 @@ export const useCoreStore = defineStore({
                         decimals: (result[i + 2] as any).result,
                         price: defillamaCoinResult.coins[`${defillamaNetwork}:${a}`]?.price?.toString() || '0',
                         balanceOf: (result[i + 3] as any).result,
+                        balanceOfProxy: (result[i + 4] as any).result,
                     })
-                    i += 4
+                    i += increment
                 }
 
-                const balance = await fetchBalance({ address: account.address as `0x${string}` })
+                const balance = promiseResult[2] as any
+                const proxyBalance = promiseResult[3] as any
                 tempAvailableTokens.push({
                     address: NATIVE_ADDRESS, // special address for native token
                     name: chain.value.name,
                     price: defillamaCoinResult.coins[`coingecko:${chain.value.name.toLowerCase()}`]?.price?.toString() || '0',
                     balanceOf: balance.value.toString(),
+                    balanceOfProxy: proxyBalance.value.toString(),
                     ...balance,
                 })
 
@@ -440,7 +453,10 @@ export const useCoreStore = defineStore({
             }) as number[]
             
             this.ownedTokens = ownedTokens
-            this.selectedToken = ownedTokens[0]
+            if (ownedTokens.length > 0) {
+                this.selectedToken = ownedTokens[0]
+                await this.getProxyAddressForToken()
+            }
         },
         async mintProxyWallets(amount: number, donation: bigint) {
             const petalexNftAddress = this.getAddress(Address.petalexNft)
@@ -489,8 +505,23 @@ export const useCoreStore = defineStore({
                 value: donation,
             })
         },
-        selectToken(tokenId: number) {
+        async selectToken(tokenId: number) {
             this.selectedToken = tokenId
+            await this.getProxyAddressForToken()
+        },
+        async getProxyAddressForToken() {
+            const petalexNftAddress = this.getAddress(Address.petalexNft)
+            if (!petalexNftAddress || !account.connected || this.ownedTokens.length === 0 || this.selectedToken === -1) {
+                return
+            }
+            const proxyAddress = await readContract({
+                address: petalexNftAddress as `0x${string}`,
+                abi: petalexAbi,
+                functionName: 'getProxyAddressForToken',
+                args: [this.selectedToken],
+            })
+
+            this.selectedProxyAddress = proxyAddress as unknown as string
         },
     },
 })
