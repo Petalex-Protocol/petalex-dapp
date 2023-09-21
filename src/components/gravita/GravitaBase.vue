@@ -5,15 +5,21 @@ import NetworkUnsupported from '../common/NetworkUnsupported.vue'
 import { chain, account } from '@kolirt/vue-web3-auth'
 import { standardiseDecimals } from '../../utils/bn'
 import { useGravitaStore } from '../../store/gravita'
+import { useRoute, useRouter } from 'vue-router'
 
 const core = useCoreStore()
 const gravita = useGravitaStore()
 const adminAddress = computed(() => core.getAddress(Address.gravitaAdmin))
+const route = useRoute()
+const router = useRouter()
 
 const activeCollaterals = computed(() => gravita.gravitaCollateralInfo?.filter(x => x.isActive) || [])
 const loading = ref(false)
 
 const init = async () => {
+    if (route.meta.requiresMint && core.ownedTokens.length === 0) {
+        router.push('/mint')
+    }
     if (!loading.value) {
         try {
             if (account.connected) {

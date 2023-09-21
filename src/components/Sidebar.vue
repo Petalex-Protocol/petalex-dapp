@@ -17,6 +17,8 @@ const init = async () => {
                     await core.getPetalexInfo(account.address)
                 }
                 await core.getGeneralTokenInfo()
+            } else {
+                core.disconnect()                
             }
         } catch (error) {
             console.log(error)
@@ -61,7 +63,7 @@ onMounted(init)
                         <li><router-link to="/select">Select Proxy</router-link></li>
                     </ul>
                 </li>           
-                <li class="collapse">
+                <li v-if="core.selectedProxyAddress" class="collapse">
                     <input type="radio" name="my-accordion-1" /> 
                     <div class="collapse-title">
                         Gravita
@@ -72,7 +74,7 @@ onMounted(init)
                         <li><router-link to="/gravita/close">Close</router-link></li>
                     </ul>
                 </li>
-                <li class="collapse">
+                <li v-if="core.selectedProxyAddress" class="collapse">
                     <input type="radio" name="my-accordion-1" /> 
                     <div class="collapse-title">
                         Liquity
@@ -83,7 +85,7 @@ onMounted(init)
                         <li><router-link to="/liquity/close">Close</router-link></li>
                     </ul>
                 </li>
-                <li class="collapse">
+                <li v-if="core.selectedProxyAddress" class="collapse">
                     <input type="radio" name="my-accordion-1" /> 
                     <div class="collapse-title">
                         Utilities

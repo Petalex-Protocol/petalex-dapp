@@ -41,6 +41,9 @@ const select = async (tokenId: number) => {
                         </div>
                     </div>
                 </div>
+                <div v-if="ownedTokens.length === 0" class="text-center my-4">
+                    <p class="text-lg">You do not have any NFTs, please <router-link to="/mint">Mint</router-link> one.</p>
+                </div>
             </div>
         </div>
     </div>

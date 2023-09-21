@@ -523,5 +523,12 @@ export const useCoreStore = defineStore({
 
             this.selectedProxyAddress = proxyAddress as unknown as string
         },
+        disconnect() {
+            // reset state
+            this.selectedProxyAddress = ''
+            this.selectedToken = -1
+            this.ownedTokens = []
+            this.availableTokens = []            
+        },
     },
 })
