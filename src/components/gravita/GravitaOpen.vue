@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch, Ref, nextTick} from 'vue'
-import { Address, GravitaCollateralInfo, useCoreStore } from '../../store/core'
+import { Address, useCoreStore } from '../../store/core'
 import { Location, useActionStore } from '../../store/action'
 import { standardiseDecimals, convertFromDecimals } from '../../utils/bn'
 import { watchPausable } from '@vueuse/core'
-import { useGravitaStore } from '../../store/gravita'
+import { useGravitaStore, GravitaCollateralInfo } from '../../store/gravita'
 
 const core = useCoreStore()
 const actionStore = useActionStore()
@@ -101,6 +101,9 @@ const addAction = async () => {
                 location: Location.proxy,
             }],
         }, actionStore.getActions.length)
+
+        // update store to reflect changes
+        gravita.adjustVessel(selectedCollateral.value.address, coll.toString(), debt.toString())
     } finally {
         loading.value = false
     }

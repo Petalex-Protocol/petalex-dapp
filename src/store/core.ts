@@ -63,18 +63,6 @@ export interface ActiveVessel {
     hasVessel: boolean
 }
 
-export interface GravitaCollateralInfo extends Token {
-    mintCap: string
-    minNetDebt: string
-    totalAssetDebt: string
-    isActive: boolean
-    minCollateralRatio: string
-    recoveryCollateralRadio: string
-    priceFeed: string
-    priceDecimals: string
-    isPriceEthIndexed: boolean
-}
-
 export interface Token {
     address: string
     name: string

@@ -312,6 +312,8 @@ export const useGravitaStore = defineStore({
             }
 
             this.gravitaCollateralInfo = infos
+
+            // TODO: should also update core token list with these collateral tokens so we have the balances and token info for other parts of the app
         },
         async calculateGravitaHints(collateralAddress: string, coll: bigint, debt: bigint) {
             const core = useCoreStore()
@@ -358,6 +360,14 @@ export const useGravitaStore = defineStore({
             })
 
             return { upperHint: insertPositionResult[0], lowerHint: insertPositionResult[1] }
+        },
+        adjustVessel(collateralAddress: string, collateralAmount: string, debtAmount: string) {
+            const collateral = this.gravitaCollateralInfo.find(x => x.address === collateralAddress)
+            if (collateral) {
+                collateral.vesselStatus = 1
+                collateral.vesselCollateral = collateralAmount
+                collateral.vesselDebt = debtAmount
+            }
         },
     },
 })

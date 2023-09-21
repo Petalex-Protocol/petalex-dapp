@@ -1,34 +1,75 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { Location, useActionStore } from '../../store/action'
+import { ref } from 'vue'
+import { Action, Location, useActionStore } from '../../store/action'
 import { useCoreStore } from '../../store/core'
-import { standardiseDecimals } from '../../utils/bn';
+import { convertFromDecimals } from '../../utils/bn';
 
 const actions = useActionStore()
 const core = useCoreStore()
 const loading = ref(false)
 
-const missingBalancesWallet = computed(() => {   
-    return actions.getBalances.filter(x => x.amount < 0 && x.location === Location.wallet).map(x => {
-        const token = core.availableTokens.find(b => b.symbol === x.symbol)
-        return {
-            symbol: x.symbol,
-            address: x.address,
-            amount: standardiseDecimals(token?.balanceOf ?? 0, token?.decimals ?? 18) + x.amount
-        }
-    }).filter(x => x.amount < 0)
-})
+const actionMissingBalance = (action: Action, index: number) => {
+    let i = 0
 
-const missingBalancesProxy = computed(() => {   
-    return actions.getBalances.filter(x => x.amount < 0 && x.location === Location.proxy).map(x => {
-        const token = core.availableTokens.find(b => b.symbol === x.symbol)
-        return {
-            symbol: x.symbol,
-            address: x.address,
-            amount: standardiseDecimals(token?.balanceOfProxy ?? 0, token?.decimals ?? 18) + x.amount
+    // Only track changes between actions, so iterate through previous actions and record lowest balances
+    const trackedTokens = core.availableTokens.map(x => ({ lowestBalanceOf: BigInt(0), lowestBalanceOfProxy: BigInt(0), ...x}))
+    while (i < index) {
+        const balanceChanges = actions.actions[i].balanceChanges
+        for (const balance of balanceChanges) {
+            const token = trackedTokens.find(b => b.address === balance.address)
+            if (token) {
+                if (balance.location === Location.proxy) {
+                    token.balanceOfProxy = (BigInt(token.balanceOfProxy ?? 0) + convertFromDecimals(balance.amount, token.decimals ?? 18)).toString()
+                    if (token.lowestBalanceOfProxy > BigInt(token.balanceOfProxy)) token.lowestBalanceOfProxy = BigInt(token.balanceOfProxy)
+                } else {
+                    token.balanceOf = (BigInt(token.balanceOf ?? 0) + convertFromDecimals(balance.amount, token.decimals ?? 18)).toString()
+                    if (token.lowestBalanceOf > BigInt(token.balanceOf)) token.lowestBalanceOf = BigInt(token.balanceOf)
+                }
+            }
         }
-    }).filter(x => x.amount < 0)
-})
+        i++
+    }
+
+    // For current action, check if any balances are lower than the lowest recorded balance and that need to be shown to the user
+    const missingBalancesForAction = []
+    for (const balance of action.balanceChanges) {
+        const token = trackedTokens.find(b => b.address === balance.address)
+        if (token) {
+            const tokenBalance = BigInt((balance.location === Location.proxy ? token.balanceOfProxy : token.balanceOf) ?? 0)
+            const lowestTokenBalance = BigInt((balance.location === Location.proxy ? token.lowestBalanceOfProxy : token.lowestBalanceOf) ?? 0)
+            const newBalance = tokenBalance + convertFromDecimals(balance.amount, token.decimals ?? 18)
+            if (newBalance < 0 && newBalance < lowestTokenBalance) {
+                missingBalancesForAction.push({
+                    symbol: token.symbol,
+                    address: token.address,
+                    amount: balance.amount,
+                    location: balance.location,
+                })
+            }
+        }
+    }
+
+    return missingBalancesForAction
+}
+
+const formatWarning = (missingBalances: any[]) => {
+    // N.B. \r\n doesn't work in tooltips
+    let text = ''
+    if (missingBalances.filter(x => x.location === Location.wallet).length > 0) {
+        text = 'Your address is missing the following balances:\r\n'
+        for (const balance of missingBalances.filter(x => x.location === Location.wallet)) {
+            text += `${balance.amount * -1} ${balance.symbol}`
+        }
+    }
+
+    if (missingBalances.filter(x => x.location === Location.proxy).length > 0) {
+        text = 'Your proxy wallet is missing the following balances:\r\n'
+        for (const balance of missingBalances.filter(x => x.location === Location.proxy)) {
+            text += `${balance.amount * -1} ${balance.symbol}`
+        }
+    }
+    return text
+}
 </script>
 
 <template>
@@ -46,27 +87,13 @@ const missingBalancesProxy = computed(() => {
                         </h2>
                         <div v-for="(balanceChange, j) in action.balanceChanges" :key="j" class="flex justify-between">
                             <span class="text-xs">{{ balanceChange.symbol }}</span>
-                            <span class="text-xs" :class="{'text-red-500': balanceChange.amount < 0, 'text-green-500': balanceChange.amount > 0}">{{ balanceChange.amount }}</span>
+                            <span class="text-xs" :class="{'text-red-500': balanceChange.amount < 0, 'text-green-500': balanceChange.amount > 0}">{{ balanceChange.amount.toString().indexOf('.') > -1 ? balanceChange.amount.toFixed(3) : balanceChange.amount }}</span>
+                        </div>
+                        <div v-if="!loading && actionMissingBalance(action, i).length > 0" class="tooltip flex justify-between" :data-tip="formatWarning(actionMissingBalance(action, i))">
+                            <span></span>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
                         </div>
                     </div> 
-                </div>
-            </div>
-        </div>
-        <div v-if="!loading && missingBalancesWallet.length > 0" class="my-4 alert alert-warning">
-            <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-            <h4 class="text-sm">Your address is missing the following balances:</h4>
-            <div class="flex flex-col">
-                <div v-for="balance in missingBalancesWallet" :key="balance.symbol" class="text-right">
-                    <span class="text-xs">{{ balance.symbol }} {{ (balance.amount * -1).toFixed(3) }}</span>
-                </div>
-            </div>
-        </div>
-        <div v-if="!loading && missingBalancesProxy.length > 0" class="my-4 alert alert-warning">
-            <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-            <h4 class="text-sm">The proxy address is missing the following balances:</h4>
-            <div class="flex flex-col">
-                <div v-for="balance in missingBalancesProxy" :key="balance.symbol" class="text-right">
-                    <span class="text-xs">{{ balance.symbol }} {{ (balance.amount * -1).toFixed(3) }}</span>
                 </div>
             </div>
         </div>

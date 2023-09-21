@@ -34,22 +34,6 @@ export const useActionStore = defineStore({
         getActions(state: ActionState) {
             return state.actions
         },
-        getBalances(state: ActionState): BalanceChange[] {
-            const balances: BalanceChange[] = []
-            for (const action of state.actions) {
-                for (const balanceChange of action.balanceChanges) {
-                    const index = balances.findIndex((b) => b.symbol === balanceChange.symbol && b.location === balanceChange.location)
-                    if (index === -1) {
-                        balances.push({
-                            ...balanceChange // copy to not affect calculations
-                        })
-                    } else {
-                        balances[index].amount += balanceChange.amount
-                    }
-                }
-            }
-            return balances
-        },
     },
     actions: {
         spliceAction(action: Action, index: number) {

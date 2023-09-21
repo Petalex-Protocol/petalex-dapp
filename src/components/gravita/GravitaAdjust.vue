@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch, Ref, nextTick} from 'vue'
-import { Address, GravitaCollateralInfo, useCoreStore } from '../../store/core'
+import { Address, useCoreStore } from '../../store/core'
 import { Location, useActionStore } from '../../store/action'
 import { standardiseDecimals, convertFromDecimals } from '../../utils/bn'
 import { watchPausable } from '@vueuse/core'
-import { useGravitaStore } from '../../store/gravita'
+import { useGravitaStore, GravitaCollateralInfo } from '../../store/gravita'
 
 const core = useCoreStore()
 const actionStore = useActionStore()
@@ -41,6 +41,26 @@ const collateralRatio = computed(() => {
 const loanToValue = computed(() => {
     if (!selectedCollateral.value) return 0
     return Number(debtAmount.value) / collateralValue.value * 100
+})
+
+const existingCollateral = computed(() => {
+    if (!selectedCollateral.value) return BigInt(0)
+    return BigInt(selectedCollateral.value.vesselCollateral)
+})
+
+const existingDebt = computed(() => {
+    if (!selectedCollateral.value) return BigInt(0)
+    return BigInt(selectedCollateral.value.vesselDebt)
+})
+
+const collateralDelta = computed(() => {
+    if (!selectedCollateral.value) return BigInt(0)
+    return convertFromDecimals(collateralAmount.value, selectedCollateral.value.decimals) - existingCollateral.value
+})
+
+const debtDelta = computed(() => {
+    if (!selectedCollateral.value) return BigInt(0)
+    return convertFromDecimals(debtAmount.value, 18) - existingDebt.value
 })
 
 const { pause: pauseDebtAmount, resume: resumeDebtAmount } = watchPausable(debtAmount, async () => {
@@ -84,23 +104,31 @@ const addAction = async () => {
         const coll = convertFromDecimals(collateralAmount.value, selectedCollateral.value.decimals)
         const debt = convertFromDecimals(debtAmount.value, 18)
 
+        let collDeposit = collateralDelta.value > 0 ? collateralDelta.value : BigInt(0)
+        let collWithdraw = collateralDelta.value < 0 ? collateralDelta.value * BigInt(-1) : BigInt(0)
+        let debtChange = debtDelta.value > 0 ? debtDelta.value : debtDelta.value * BigInt(-1)
+
         const { upperHint, lowerHint } = await gravita.calculateGravitaHints(selectedCollateral.value.address, coll, debt)
         actionStore.spliceAction({
             name: 'GravitaAdjust',
             displayName: 'Adjust Vessel',
-            calldata: [selectedCollateral.value.address, coll, debt, upperHint, lowerHint],
+            // collateral, collDeposit, collWithdraw, debtChange, isDebtIncrease, upperHint, lowerHint
+            calldata: [selectedCollateral.value.address, collDeposit, collWithdraw, debtChange, debtDelta.value > 0, upperHint, lowerHint],
             balanceChanges: [{
                 symbol: selectedCollateral.value.symbol,
                 address: selectedCollateral.value.address,
-                amount: collateralAmount.value * -1,
+                amount: standardiseDecimals(collateralDelta.value, selectedCollateral.value.decimals) * -1,
                 location: Location.proxy,
             }, {
                 symbol: 'GRAI',
                 address: core.getAddress(Address.gravitaDebtToken) as string,
-                amount: debtAmount.value,
+                amount: standardiseDecimals(debtDelta.value, 18),
                 location: Location.proxy,
             }],
         }, actionStore.getActions.length)
+
+        // update store to reflect changes
+        gravita.adjustVessel(selectedCollateral.value.address, coll.toString(), debt.toString())
     } finally {
         loading.value = false
     }
