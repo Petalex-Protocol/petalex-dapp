@@ -25,7 +25,6 @@ const init = async () => {
             if (account.connected) {
                 loading.value = true
                 await gravita.getGravitaCollateralInfo()
-                await gravita.getActiveVessels()
             }
         } catch (error) {
             console.log(error)

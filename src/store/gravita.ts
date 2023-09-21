@@ -3,17 +3,13 @@ import { erc20ABI, multicall, account, readContract } from '@kolirt/vue-web3-aut
 import adminAbi from '../abi/gravita/admin.json'
 import priceFeedAbi from '../abi/gravita/pricefeed.json'
 import vesselManagerOperationsAbi from '../abi/gravita/vesselmanageroperations.json'
+import vesselManagerAbi from '../abi/gravita/vesselmanager.json'
 import sortedVesselsAbi from '../abi/gravita/sortedvessels.json'
 import oracleAbi from '../abi/gravita/oracle.json'
 
 import { useActionStore } from "./action"
 import { useCoreStore, Token, Address } from "./core"
 import { getRandomInt } from "../utils/math"
-
-export interface ActiveVessel {
-    address: string
-    hasVessel: boolean
-}
 
 export interface GravitaCollateralInfo extends Token {
     mintCap: string
@@ -26,11 +22,14 @@ export interface GravitaCollateralInfo extends Token {
     priceFeed: string
     priceDecimals: string
     isPriceEthIndexed: boolean
+
+    vesselStatus: number
+    vesselCollateral: string
+    vesselDebt: string
 }
 
 export interface GravitaState {
     gravitaCollateralInfo: GravitaCollateralInfo[]
-    activeVessels: ActiveVessel[]
 }
 
 export const useGravitaStore = defineStore({
@@ -38,7 +37,6 @@ export const useGravitaStore = defineStore({
     state: () => 
         ({
             gravitaCollateralInfo: [],
-            activeVessels: [],
         }) as GravitaState,
     getters: {
         getAggregatedActiveVessels: (state: GravitaState) => {
@@ -49,7 +47,7 @@ export const useGravitaStore = defineStore({
                     address: x.calldata[0],
                     hasVessel: true
                 })),
-                ...state.activeVessels.filter(x => !openedVessels.find(y => y.calldata[0] === x.address))
+                ...state.gravitaCollateralInfo.map(x => ({ address: x.address, hasVessel: x.vesselStatus === 1 }))
             ]
         },
     },
@@ -58,7 +56,8 @@ export const useGravitaStore = defineStore({
             const core = useCoreStore()
             this.gravitaCollateralInfo = []
             const address = core.getAddress(Address.gravitaAdmin)
-            if (!address || !account.connected) {
+            const vesselManagerAddress = core.getAddress(Address.gravitaVesselManager)
+            if (!address || !vesselManagerAddress || !account.connected) {
                 return
             }
 
@@ -98,6 +97,7 @@ export const useGravitaStore = defineStore({
             const collateralCalls: any[] = []
             const priceFeedCalls: any[] = []
             const infos: GravitaCollateralInfo[] = []
+            const vesselStatusCalls: any[] = []
             for (const collateral of collaterals) {
                 calls.push(['getMintCap', [collateral]])
                 calls.push(['getMinNetDebt', [collateral]])
@@ -122,6 +122,9 @@ export const useGravitaStore = defineStore({
                     price: '0',
                     priceDecimals: '8',
                     isPriceEthIndexed: false,
+                    vesselStatus: 0,
+                    vesselCollateral: '0',
+                    vesselDebt: '0',
                 })
                 collateralCalls.push({
                     abi: erc20ABI,
@@ -140,6 +143,15 @@ export const useGravitaStore = defineStore({
                         ['oracles', [collateral]],
                     ],
                 })
+                vesselStatusCalls.push({
+                    abi: vesselManagerAbi,
+                    contractAddress: vesselManagerAddress as `0x${string}`,
+                    calls: [
+                        ['getVesselColl', [collateral, core.selectedProxyAddress]],
+                        ['getVesselDebt', [collateral, core.selectedProxyAddress]],
+                        ['getVesselStatus', [collateral, core.selectedProxyAddress]],
+                    ]
+                })
             }
 
             const result = await multicall({
@@ -151,6 +163,7 @@ export const useGravitaStore = defineStore({
                     },
                     ...collateralCalls,
                     ...priceFeedCalls,
+                    ...vesselStatusCalls,
                 ]
             })
 
@@ -161,9 +174,11 @@ export const useGravitaStore = defineStore({
             let adminMod = 6 // number of admin contract calls
             let ercMod = 4 // number of erc20 calls
             let priceFeedMod = 1 // number of price feed calls
+            let vesselManagerMod = 3 // number of vessel manager calls
             let adminCalls = true
             let processingCollateralCalls = false
             let processingPriceFeedCalls = false
+            let processingVesselManagerCalls = false
 
             for (const r of result) {
                 const data = r as any
@@ -213,7 +228,7 @@ export const useGravitaStore = defineStore({
                     } else {
                         throw new Error(`Error getting collateral info: ${data}`)
                     }
-                } else {
+                } else if (processingPriceFeedCalls) {
                     if (data.status === 'success') {
                         const oracleResult = data.result as Array<any>
                         // 0 = price feed address, 1 = provider type, 2 = timeout (seconds), 3 = decimals, 4 = is eth indexed
@@ -227,8 +242,25 @@ export const useGravitaStore = defineStore({
                     } else {
                         // no price feed for this collateral so don't throw as it might just be inactive
                     }
+                } else {
+                    if (data.status === 'success') {
+                        // 0 = collateral, 1 = debt, 2 = status
+                        switch (j) {
+                            case 1:
+                                info.vesselCollateral = data.result.toString()
+                                break
+                            case 2:
+                                info.vesselDebt = data.result.toString()
+                                break
+                            case 3:
+                                info.vesselStatus = Number(data.result)
+                                break
+                        }
+                    } else {
+                        throw new Error(`Error getting vessel info: ${data}`)
+                    }
                 }
-                if ((adminCalls && (j % adminMod === 0)) || (processingCollateralCalls && (j % ercMod === 0)) || (processingPriceFeedCalls && (j % priceFeedMod === 0))) {
+                if ((adminCalls && (j % adminMod === 0)) || (processingCollateralCalls && (j % ercMod === 0)) || (processingPriceFeedCalls && (j % priceFeedMod === 0)) || (processingVesselManagerCalls && (j % vesselManagerMod === 0))) {
                     ++i
                     j = 0
                 }                
@@ -242,6 +274,11 @@ export const useGravitaStore = defineStore({
                 if (k === calls.length + (collateralCalls.length * ercMod)) {
                     processingCollateralCalls = false
                     processingPriceFeedCalls = true
+                    i = 0
+                }
+                if (k === calls.length + (collateralCalls.length * ercMod) + (priceFeedCalls.length * priceFeedMod)) {
+                    processingPriceFeedCalls = false
+                    processingVesselManagerCalls = true
                     i = 0
                 }
             }
@@ -321,10 +358,6 @@ export const useGravitaStore = defineStore({
             })
 
             return { upperHint: insertPositionResult[0], lowerHint: insertPositionResult[1] }
-        },
-        async getActiveVessels() {
-            // TODO: get proxy address from petalex nft and query gravita vessel manager for all collaterals
-            this.activeVessels = this.gravitaCollateralInfo.map(x => ({ address: x.address, hasVessel: false } as ActiveVessel))
         },
     },
 })

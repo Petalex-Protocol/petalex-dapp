@@ -24,6 +24,7 @@ export enum Address {
     gravitaVesselManagerOperations = "gravitaVesselManagerOperations",
     gravitaSortedVessels = "gravitaSortedVessels",
     gravitaDebtToken = "gravitaDebtToken",
+    gravitaVesselManager = "gravitaVesselManager",
     uniswapV3Factory = "uniswapV3Factory",
     uniswapQuoterV2 = "uniswapQuoterV2",
 
@@ -117,6 +118,10 @@ export const useCoreStore = defineStore({
                             address: "0x15f74458aE0bFdAA1a96CA1aa779D715Cc1Eefe4",
                         },
                         {
+                            name: Address.gravitaVesselManager,
+                            address: '0xdB5DAcB1DFbe16326C3656a88017f0cB4ece0977'
+                        },
+                        {
                             name: Address.uniswapV3Factory,
                             address: "0x1F98431c8aD98523631AE4a59f267346ea31F984",
                         },
@@ -144,6 +149,10 @@ export const useCoreStore = defineStore({
                         {
                             name: Address.gravitaDebtToken,
                             address: "0x894134a25a5faC1c2C26F1d8fBf05111a3CB9487",
+                        },
+                        {
+                            name: Address.gravitaVesselManager,
+                            address: '0x6AdAA3eBa85c77e8566b73AEfb4C2f39Df4046Ca'
                         },
                         {
                             name: Address.uniswapV3Factory,
