@@ -25,11 +25,6 @@ const availableDebt = computed(() => {
 
 const collateralValue = computed(() => {
     if (!selectedCollateral.value) return 0
-    if (selectedCollateral.value.isPriceEthIndexed) {
-        const ethCollateral = activeCollaterals.value.find(x => x.symbol === 'WETH');
-        if (!ethCollateral) return 0
-        return Number(collateralAmount.value) * standardiseDecimals(selectedCollateral.value.price, selectedCollateral.value.priceDecimals) * standardiseDecimals(ethCollateral.price, ethCollateral.priceDecimals)
-    }
     return Number(collateralAmount.value) * standardiseDecimals(selectedCollateral.value.price, selectedCollateral.value.priceDecimals)
 })
 

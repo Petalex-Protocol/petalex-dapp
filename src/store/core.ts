@@ -7,6 +7,7 @@ import { getRandomInt } from "../utils/math"
 import { solidityPacked } from "ethers"
 import { CoinResult, getCoins } from "../utils/defillama_api"
 import { convertFromDecimals, standardiseDecimals } from "../utils/bn"
+import { useActionStore } from "./action"
 
 export const NATIVE_ADDRESS = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE'
 
@@ -243,6 +244,10 @@ export const useCoreStore = defineStore({
     actions: {
         setCurrentNetwork(network: Network) {         
             this.connectedNetwork = network
+            this.disconnect()
+
+            const actionStore = useActionStore()
+            actionStore.disconnect()
         },        
         async getBalances(addresses: string[]) {
             if (!account.connected || addresses.length === 0) {

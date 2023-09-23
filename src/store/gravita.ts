@@ -10,6 +10,7 @@ import oracleAbi from '../abi/gravita/oracle.json'
 import { useActionStore } from "./action"
 import { useCoreStore, Token, Address } from "./core"
 import { getRandomInt } from "../utils/math"
+import { convertFromDecimals, standardiseDecimals } from "../utils/bn"
 
 export interface GravitaCollateralInfo extends Token {
     mintCap: string
@@ -133,7 +134,8 @@ export const useGravitaStore = defineStore({
                         ['name', []],
                         ['symbol', []],
                         ['decimals', []],
-                        ['balanceOf', [account.address]]
+                        ['balanceOf', [account.address]],
+                        ['balanceOf', [core.selectedProxyAddress]]
                     ],
                 })
                 priceFeedCalls.push({
@@ -172,7 +174,7 @@ export const useGravitaStore = defineStore({
             let j = 1
             let k = 0
             let adminMod = 6 // number of admin contract calls
-            let ercMod = 4 // number of erc20 calls
+            let ercMod = 5 // number of erc20 calls
             let priceFeedMod = 1 // number of price feed calls
             let vesselManagerMod = 3 // number of vessel manager calls
             let adminCalls = true
@@ -223,6 +225,9 @@ export const useGravitaStore = defineStore({
                                 break
                             case 4:
                                 info.balanceOf = data.result.toString()
+                                break
+                            case 5:
+                                info.balanceOfProxy = data.result.toString()
                                 break
                         }
                     } else {
@@ -311,9 +316,18 @@ export const useGravitaStore = defineStore({
                 ++i
             }
 
+            for (const info of infos) {
+                if (info.isPriceEthIndexed) {
+                    const ethCollateral = infos.find(x => x.symbol === 'WETH');
+                    if (ethCollateral) {
+                        info.price = convertFromDecimals(standardiseDecimals(info.price, info.priceDecimals) * standardiseDecimals(ethCollateral.price, ethCollateral.priceDecimals), info.priceDecimals).toString()
+                    }
+                }
+            }
+
             this.gravitaCollateralInfo = infos
 
-            // TODO: should also update core token list with these collateral tokens so we have the balances and token info for other parts of the app
+            core.availableTokens.push(...this.gravitaCollateralInfo.filter(x => !core.availableTokens.find(a => a.address === x.address)))
         },
         async calculateGravitaHints(collateralAddress: string, coll: bigint, debt: bigint) {
             const core = useCoreStore()
@@ -367,6 +381,14 @@ export const useGravitaStore = defineStore({
                 collateral.vesselStatus = 1
                 collateral.vesselCollateral = collateralAmount
                 collateral.vesselDebt = debtAmount
+            }
+        },
+        closeVessel(collateralAddress: string) {
+            const collateral = this.gravitaCollateralInfo.find(x => x.address === collateralAddress)
+            if (collateral) {
+                collateral.vesselStatus = 0
+                collateral.vesselCollateral = '0'
+                collateral.vesselDebt = '0'
             }
         },
     },

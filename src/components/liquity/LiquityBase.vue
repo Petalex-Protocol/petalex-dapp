@@ -3,6 +3,7 @@ import { onMounted, ref, watch } from 'vue'
 import { useCoreStore } from '../../store/core'
 import { chain, account } from '@kolirt/vue-web3-auth'
 import { useRoute, useRouter } from 'vue-router'
+import ComingSoon from '../common/ComingSoon.vue';
 
 const core = useCoreStore()
 const route = useRoute()
@@ -33,5 +34,6 @@ onMounted(init)
 </script>
 
 <template>
+    <ComingSoon />
     <RouterView />
 </template>

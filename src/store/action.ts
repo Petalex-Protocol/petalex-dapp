@@ -55,5 +55,8 @@ export const useActionStore = defineStore({
             this.actions.splice(index, 1)
             
         },
+        disconnect() {
+            this.actions = []
+        },
     },
 })
