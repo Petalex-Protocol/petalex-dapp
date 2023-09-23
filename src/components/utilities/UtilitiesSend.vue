@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { Token, useCoreStore } from '../../store/core'
-import { Location, useActionStore } from '../../store/action'
+import { ActionType, Location, useActionStore } from '../../store/action'
 import { convertFromDecimals, standardiseDecimals } from '../../utils/bn';
 import { account } from '@kolirt/vue-web3-auth';
 
@@ -25,7 +25,7 @@ const addAction = async () => {
     loading.value = true
     try {
         actionStore.spliceAction({
-            name: 'Send',
+            type: ActionType.Send,
             displayName: 'Send',
             // token, to address, amount
             calldata: [token.value.address, account.address, convertFromDecimals(amount.value, token.value.decimals)],

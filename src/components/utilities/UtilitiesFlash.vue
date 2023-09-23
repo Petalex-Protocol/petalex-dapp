@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, Ref } from 'vue'
 import { useCoreStore, Token } from '../../store/core'
-import { Location, useActionStore } from '../../store/action'
+import { ActionType, Location, useActionStore } from '../../store/action'
 import { convertFromDecimals } from '../../utils/bn'
 
 const core = useCoreStore()
@@ -21,7 +21,7 @@ const error = computed(() => {
     if (amount0.value === 0 && amount1.value === 0) return 'Must specify an amount on at least one token'
     if (token0.value.address === '' || token1.value.address === '') return 'Must specify a token'
     if (token0.value.address === token1.value.address) return 'Tokens must be different'
-    if (actionStore.getActions.some(x => x.name === 'Flash')) return 'Only one flash loan action is allowed at a time'
+    if (actionStore.getActions.some(x => x.type === ActionType.Flash)) return 'Only one flash loan action is allowed at a time'
     return null
 })
 
@@ -33,7 +33,7 @@ const addAction = async () => {
     try {
         const poolAddress = await core.getPoolAddress(token0.value, token1.value, fee.value)
         actionStore.spliceAction({
-            name: 'Flash',
+            type: ActionType.Flash,
             displayName: 'Flash Loan',
             // token0, token1, pool address, amount0, amount1
             calldata: [token0.value.address, token1.value.address, poolAddress, convertFromDecimals(amount0.value, token0.value.decimals), convertFromDecimals(amount1.value, token1.value.decimals)],
@@ -53,7 +53,7 @@ const addAction = async () => {
         }, 0) // always the first index
 
         actionStore.spliceAction({
-            name: 'FlashReturn',
+            type: ActionType.FlashReturn,
             displayName: 'Flash Loan Return',
             // token0, token1, pool address, amount0, amount1
             calldata: [token0.value.address, token1.value.address, poolAddress, convertFromDecimals(amount0.value, token0.value.decimals), convertFromDecimals(amount1.value, token1.value.decimals)],

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch, Ref} from 'vue'
 import { Address, useCoreStore } from '../../store/core'
-import { Location, useActionStore } from '../../store/action'
+import { ActionType, Location, useActionStore } from '../../store/action'
 import { useGravitaStore, GravitaCollateralInfo } from '../../store/gravita'
 
 const core = useCoreStore()
@@ -28,7 +28,7 @@ const addAction = async () => {
     loading.value = true
     try {
         actionStore.spliceAction({
-            name: 'GravitaClose',
+            type: ActionType.GravitaClose,
             displayName: 'Close Vessel',
             // collateral
             calldata: [selectedCollateral.value.address],

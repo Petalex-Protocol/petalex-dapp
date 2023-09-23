@@ -7,7 +7,7 @@ import vesselManagerAbi from '../abi/gravita/vesselmanager.json'
 import sortedVesselsAbi from '../abi/gravita/sortedvessels.json'
 import oracleAbi from '../abi/gravita/oracle.json'
 
-import { useActionStore } from "./action"
+import { ActionType, useActionStore } from "./action"
 import { useCoreStore, Token, Address } from "./core"
 import { getRandomInt } from "../utils/math"
 import { convertFromDecimals, standardiseDecimals } from "../utils/bn"
@@ -43,7 +43,7 @@ export const useGravitaStore = defineStore({
     getters: {
         getAggregatedActiveVessels: (state: GravitaState) => {
             const actionStore = useActionStore()
-            const openedVessels = actionStore.actions?.filter(x => x.name === 'GravitaOpen') || []
+            const openedVessels = actionStore.actions?.filter(x => x.type === ActionType.GravitaOpen) || []
             return [
                 ...openedVessels.map(x => ({
                     address: x.calldata[0],
@@ -403,7 +403,7 @@ export const useGravitaStore = defineStore({
                 collateral.vesselDebt = (collateral.restoreData?[2] : '0').toString()
             }
 
-            const openedVessels = actionStore.actions?.filter(x => x.name === 'GravitaOpen') || []
+            const openedVessels = actionStore.actions?.filter(x => x.type === ActionType.GravitaOpen) || []
             for (const vessel of openedVessels) {
                 if (vessel.data) {
                     const collateralAddress = vessel.data[0]
@@ -413,7 +413,7 @@ export const useGravitaStore = defineStore({
                 }                
             }
 
-            const adjustedVessels = actionStore.actions?.filter(x => x.name === 'GravitaAdjust') || []
+            const adjustedVessels = actionStore.actions?.filter(x => x.type === ActionType.GravitaAdjust) || []
             for (const vessel of adjustedVessels) {
                 if (vessel.data) {
                     const collateralAddress = vessel.data[0]
@@ -423,7 +423,7 @@ export const useGravitaStore = defineStore({
                 }
             }
 
-            const closedVessels = actionStore.actions?.filter(x => x.name === 'GravitaClose') || []
+            const closedVessels = actionStore.actions?.filter(x => x.type === ActionType.GravitaClose) || []
             for (const vessel of closedVessels) {
                 const collateralAddress = vessel.calldata[0]
                 this.closeVessel(collateralAddress)

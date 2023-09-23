@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch, Ref, nextTick} from 'vue'
 import { Address, useCoreStore } from '../../store/core'
-import { Location, useActionStore } from '../../store/action'
+import { ActionType, Location, useActionStore } from '../../store/action'
 import { standardiseDecimals, convertFromDecimals } from '../../utils/bn'
 import { watchPausable } from '@vueuse/core'
 import { useGravitaStore, GravitaCollateralInfo } from '../../store/gravita'
@@ -105,7 +105,7 @@ const addAction = async () => {
 
         const { upperHint, lowerHint } = await gravita.calculateGravitaHints(selectedCollateral.value.address, coll, debt)
         actionStore.spliceAction({
-            name: 'GravitaAdjust',
+            type: ActionType.GravitaAdjust,
             displayName: 'Adjust Vessel',
             // collateral, collDeposit, collWithdraw, debtChange, isDebtIncrease, upperHint, lowerHint
             calldata: [selectedCollateral.value.address, collDeposit, collWithdraw, debtChange, debtDelta.value > 0, upperHint, lowerHint],

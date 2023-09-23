@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useCoreStore, Token, NATIVE_ADDRESS } from '../../store/core'
-import { Location, useActionStore } from '../../store/action'
+import { ActionType, Location, useActionStore } from '../../store/action'
 import { convertFromDecimals, standardiseDecimals } from '../../utils/bn'
 import { useDebounceFn } from '@vueuse/core'
 
@@ -65,7 +65,7 @@ const addAction = async () => {
     loading.value = true
     try {
         actionStore.spliceAction({
-            name: 'UniswapV3ExactInput',
+            type: ActionType.UniswapV3ExactInput,
             displayName: 'Exchange',
             // token, amount, amoutnOutMin, path
             calldata: [token0.value.address, convertFromDecimals(amount0.value, token0.value.decimals), convertFromDecimals(amount1.value * ((100 - slippage.value) / 100), token1.value.decimals), chosenPathCallData.value],

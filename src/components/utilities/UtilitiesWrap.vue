@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useCoreStore } from '../../store/core'
-import { Location, useActionStore } from '../../store/action'
+import { ActionType, Location, useActionStore } from '../../store/action'
 import { convertFromDecimals, standardiseDecimals } from '../../utils/bn';
 
 const core = useCoreStore()
@@ -24,7 +24,7 @@ const addAction = async () => {
     loading.value = true
     try {
         actionStore.spliceAction({
-            name: 'Wrap',
+            type: ActionType.Wrap,
             displayName: 'Wrap',
             // amount
             calldata: [convertFromDecimals(amount.value, ethToken.value.decimals)],
