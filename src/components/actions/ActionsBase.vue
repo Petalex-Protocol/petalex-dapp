@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Action, Location, useActionStore } from '../../store/action'
+import { Action, BalanceChange, Location, useActionStore } from '../../store/action'
 import { useCoreStore } from '../../store/core'
-import { convertFromDecimals } from '../../utils/bn';
+import { standardiseDecimals } from '../../utils/bn';
 
 const actions = useActionStore()
 const core = useCoreStore()
@@ -19,10 +19,10 @@ const actionMissingBalance = (action: Action, index: number) => {
             const token = trackedTokens.find(b => b.address === balance.address)
             if (token) {
                 if (balance.location === Location.proxy) {
-                    token.balanceOfProxy = (BigInt(token.balanceOfProxy ?? 0) + convertFromDecimals(balance.amount, token.decimals ?? 18)).toString()
+                    token.balanceOfProxy = (BigInt(token.balanceOfProxy ?? 0) + balance.amount).toString()
                     if (token.lowestBalanceOfProxy > BigInt(token.balanceOfProxy)) token.lowestBalanceOfProxy = BigInt(token.balanceOfProxy)
                 } else {
-                    token.balanceOf = (BigInt(token.balanceOf ?? 0) + convertFromDecimals(balance.amount, token.decimals ?? 18)).toString()
+                    token.balanceOf = (BigInt(token.balanceOf ?? 0) + balance.amount).toString()
                     if (token.lowestBalanceOf > BigInt(token.balanceOf)) token.lowestBalanceOf = BigInt(token.balanceOf)
                 }
             }
@@ -37,14 +37,15 @@ const actionMissingBalance = (action: Action, index: number) => {
         if (token) {
             const tokenBalance = BigInt((balance.location === Location.proxy ? token.balanceOfProxy : token.balanceOf) ?? 0)
             const lowestTokenBalance = BigInt((balance.location === Location.proxy ? token.lowestBalanceOfProxy : token.lowestBalanceOf) ?? 0)
-            const newBalance = tokenBalance + convertFromDecimals(balance.amount, token.decimals ?? 18)
+            const newBalance = tokenBalance + balance.amount
             if (newBalance < 0 && newBalance < lowestTokenBalance) {
                 missingBalancesForAction.push({
-                    symbol: token.symbol,
-                    address: token.address,
+                    symbol: balance.symbol,
+                    address: balance.address,
+                    decimals: balance.decimals,
                     amount: balance.amount,
                     location: balance.location,
-                })
+                } as BalanceChange)
             }
         }
     }
@@ -52,20 +53,20 @@ const actionMissingBalance = (action: Action, index: number) => {
     return missingBalancesForAction
 }
 
-const formatWarning = (missingBalances: any[]) => {
+const formatWarning = (missingBalances: BalanceChange[]) => {
     // N.B. \r\n doesn't work in tooltips
     let text = ''
     if (missingBalances.filter(x => x.location === Location.wallet).length > 0) {
         text = 'Your address is missing the following balances:\r\n'
         for (const balance of missingBalances.filter(x => x.location === Location.wallet)) {
-            text += `${balance.amount * -1} ${balance.symbol}`
+            text += `${standardiseDecimals(balance.amount * BigInt(-1), balance.decimals)} ${balance.symbol}`
         }
     }
 
     if (missingBalances.filter(x => x.location === Location.proxy).length > 0) {
         text = 'Your proxy wallet is missing the following balances:\r\n'
         for (const balance of missingBalances.filter(x => x.location === Location.proxy)) {
-            text += `${balance.amount * -1} ${balance.symbol}`
+            text += `${standardiseDecimals(balance.amount * BigInt(-1), balance.decimals)} ${balance.symbol}`
         }
     }
     return text
@@ -87,7 +88,7 @@ const formatWarning = (missingBalances: any[]) => {
                         </h2>
                         <div v-for="(balanceChange, j) in action.balanceChanges" :key="j" class="flex justify-between">
                             <span class="text-xs">{{ balanceChange.symbol }}</span>
-                            <span class="text-xs" :class="{'text-red-500': balanceChange.amount < 0, 'text-green-500': balanceChange.amount > 0}">{{ balanceChange.amount.toString().indexOf('.') > -1 ? balanceChange.amount.toFixed(3) : balanceChange.amount }}</span>
+                            <span class="text-xs" :class="{'text-red-500': balanceChange.amount < 0, 'text-green-500': balanceChange.amount > 0}">{{ standardiseDecimals(balanceChange.amount, balanceChange.decimals).toString().indexOf('.') > -1 ? standardiseDecimals(balanceChange.amount, balanceChange.decimals).toFixed(3) : standardiseDecimals(balanceChange.amount, balanceChange.decimals) }}</span>
                         </div>
                         <div v-if="!loading && actionMissingBalance(action, i).length > 0" class="tooltip flex justify-between" :data-tip="formatWarning(actionMissingBalance(action, i))">
                             <span></span>

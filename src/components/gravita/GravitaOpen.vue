@@ -87,14 +87,20 @@ const addAction = async () => {
             balanceChanges: [{
                 symbol: selectedCollateral.value.symbol,
                 address: selectedCollateral.value.address,
-                amount: collateralAmount.value * -1,
+                decimals: selectedCollateral.value.decimals,
+                amount: coll * BigInt(-1),
                 location: Location.proxy,
             }, {
                 symbol: 'GRAI',
                 address: core.getAddress(Address.gravitaDebtToken) as string,
-                amount: debtAmount.value,
+                amount: debt,
+                decimals: 18,
                 location: Location.proxy,
             }],
+            removeAction: () => {
+                gravita.recalculateActiveVessels()
+            },
+            data: [selectedCollateral.value.address, coll, debt],
         }, actionStore.getActions.length)
 
         // update store to reflect changes

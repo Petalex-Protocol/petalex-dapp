@@ -27,6 +27,7 @@ export interface GravitaCollateralInfo extends Token {
     vesselStatus: number
     vesselCollateral: string
     vesselDebt: string
+    restoreData?: any[]
 }
 
 export interface GravitaState {
@@ -323,6 +324,8 @@ export const useGravitaStore = defineStore({
                         info.price = convertFromDecimals(standardiseDecimals(info.price, info.priceDecimals) * standardiseDecimals(ethCollateral.price, ethCollateral.priceDecimals), info.priceDecimals).toString()
                     }
                 }
+
+                info.restoreData = [info.vesselStatus, info.vesselCollateral, info.vesselDebt]
             }
 
             this.gravitaCollateralInfo = infos
@@ -389,6 +392,41 @@ export const useGravitaStore = defineStore({
                 collateral.vesselStatus = 0
                 collateral.vesselCollateral = '0'
                 collateral.vesselDebt = '0'
+            }
+        },
+        recalculateActiveVessels() {
+            const actionStore = useActionStore()
+
+            for (const collateral of this.gravitaCollateralInfo) {
+                collateral.vesselStatus = Number(collateral.restoreData?[0] : 0)
+                collateral.vesselCollateral = (collateral.restoreData?[1] : '0').toString()
+                collateral.vesselDebt = (collateral.restoreData?[2] : '0').toString()
+            }
+
+            const openedVessels = actionStore.actions?.filter(x => x.name === 'GravitaOpen') || []
+            for (const vessel of openedVessels) {
+                if (vessel.data) {
+                    const collateralAddress = vessel.data[0]
+                    const collateralAmount = vessel.data[1]
+                    const debtAmount = vessel.data[2]
+                    this.adjustVessel(collateralAddress, collateralAmount, debtAmount)
+                }                
+            }
+
+            const adjustedVessels = actionStore.actions?.filter(x => x.name === 'GravitaAdjust') || []
+            for (const vessel of adjustedVessels) {
+                if (vessel.data) {
+                    const collateralAddress = vessel.data[0]
+                    const collateralAmount = vessel.data[1]
+                    const debtAmount = vessel.data[2]
+                    this.adjustVessel(collateralAddress, collateralAmount, debtAmount)
+                }
+            }
+
+            const closedVessels = actionStore.actions?.filter(x => x.name === 'GravitaClose') || []
+            for (const vessel of closedVessels) {
+                const collateralAddress = vessel.calldata[0]
+                this.closeVessel(collateralAddress)
             }
         },
     },

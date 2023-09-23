@@ -31,12 +31,14 @@ const addAction = async () => {
             balanceChanges: [{
                 symbol: wethToken.value?.symbol,
                 address: wethToken.value.address,
-                amount: amount.value * -1,
+                decimals: wethToken.value.decimals,
+                amount: convertFromDecimals(amount.value * -1, wethToken.value.decimals),
                 location: Location.proxy,
             }, {
                 symbol: ethToken.value.symbol,
                 address: ethToken.value.address,
-                amount: amount.value,
+                decimals: ethToken.value.decimals,
+                amount: convertFromDecimals(amount.value, ethToken.value.decimals),
                 location: Location.proxy,
             }],
         }, actionStore.actions.length)

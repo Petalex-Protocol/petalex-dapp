@@ -8,7 +8,8 @@ export enum Location {
 export interface BalanceChange {
     symbol: string
     address: string
-    amount: number
+    decimals: number
+    amount: bigint
     location: Location
 }
 
@@ -17,7 +18,9 @@ export interface Action {
     displayName: string
     calldata: any[]
     value?: bigint
-    balanceChanges: BalanceChange[]
+    balanceChanges: BalanceChange[],
+    removeAction?: () => void,
+    data?: any[],
 }
 
 export interface ActionState {
@@ -44,6 +47,8 @@ export const useActionStore = defineStore({
             this.actions.splice(index, 0, action)
         },
         removeAction(index: number) {
+            const removeAction = this.actions[index].removeAction
+
             if (this.actions[index].name === 'Flash') {
                 const returnIndex = this.actions.findIndex(x => x.name === 'FlashReturn')
                 this.actions.splice(returnIndex, 1)
@@ -53,7 +58,10 @@ export const useActionStore = defineStore({
                 index -= 1
             }
             this.actions.splice(index, 1)
-            
+
+            if (removeAction) {
+                (removeAction as () => void)()
+            }
         },
         disconnect() {
             this.actions = []

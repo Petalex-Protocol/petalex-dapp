@@ -2,7 +2,6 @@
 import { computed, ref, watch, Ref} from 'vue'
 import { Address, useCoreStore } from '../../store/core'
 import { Location, useActionStore } from '../../store/action'
-import { standardiseDecimals } from '../../utils/bn'
 import { useGravitaStore, GravitaCollateralInfo } from '../../store/gravita'
 
 const core = useCoreStore()
@@ -36,14 +35,19 @@ const addAction = async () => {
             balanceChanges: [{
                 symbol: selectedCollateral.value.symbol,
                 address: selectedCollateral.value.address,
-                amount: standardiseDecimals(selectedCollateral.value.vesselCollateral, selectedCollateral.value.decimals),
+                decimals: selectedCollateral.value.decimals,
+                amount: BigInt(selectedCollateral.value.vesselCollateral),
                 location: Location.proxy,
             }, {
                 symbol: 'GRAI',
                 address: core.getAddress(Address.gravitaDebtToken) as string,
-                amount: standardiseDecimals(selectedCollateral.value.vesselDebt, 18) * -1,
+                amount: BigInt(selectedCollateral.value.vesselDebt) * BigInt(-1),
+                decimals: 18,
                 location: Location.proxy,
             }],
+            removeAction: () => {
+                gravita.recalculateActiveVessels()
+            },
         }, actionStore.getActions.length)
 
         // update store to reflect changes

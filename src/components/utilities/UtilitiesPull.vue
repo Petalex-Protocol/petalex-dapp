@@ -32,12 +32,14 @@ const addAction = async () => {
             balanceChanges: [{
                 symbol: token.value?.symbol,
                 address: token.value.address,
-                amount: amount.value * -1,
+                decimals: token.value.decimals,
+                amount: convertFromDecimals(amount.value * -1, token.value.decimals),
                 location: Location.wallet,
             }, {
                 symbol: token.value.symbol,
                 address: token.value.address,
-                amount: amount.value,
+                decimals: token.value.decimals,
+                amount: convertFromDecimals(amount.value, token.value.decimals),
                 location: Location.proxy,
             }],
         }, actionStore.actions.length)
