@@ -3,6 +3,7 @@ import { computed, ref, watch, Ref} from 'vue'
 import { Address, useCoreStore } from '../../store/core'
 import { ActionType, Location, useActionStore } from '../../store/action'
 import { useGravitaStore, GravitaCollateralInfo } from '../../store/gravita'
+import { AbiCoder } from 'ethers';
 
 const core = useCoreStore()
 const actionStore = useActionStore()
@@ -31,7 +32,8 @@ const addAction = async () => {
             type: ActionType.GravitaClose,
             displayName: 'Close Vessel',
             // collateral
-            calldata: [selectedCollateral.value.address],
+            calldata: AbiCoder.defaultAbiCoder().encode(['address'], [selectedCollateral.value.address]),
+            data: [selectedCollateral.value.address],
             balanceChanges: [{
                 symbol: selectedCollateral.value.symbol,
                 address: selectedCollateral.value.address,

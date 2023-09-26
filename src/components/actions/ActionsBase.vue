@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { Action, BalanceChange, Location, useActionStore } from '../../store/action'
 import { useCoreStore } from '../../store/core'
-import { standardiseDecimals } from '../../utils/bn';
+import { standardiseDecimals } from '../../utils/bn'
+import { useAppStore } from '../../store/app'
+import { MaxUint256 } from 'ethers'
 
 const actions = useActionStore()
 const core = useCoreStore()
 const loading = ref(false)
+const app = useAppStore()
 
 const actionMissingBalance = (action: Action, index: number) => {
     let i = 0
@@ -53,6 +56,53 @@ const actionMissingBalance = (action: Action, index: number) => {
     return missingBalancesForAction
 }
 
+const error = computed(() => {
+    if (actions.actions.length === 0) return 'Must add at least one action'
+    if (!actions.canExecute) return 'No valid actions to execute'
+    let i = 0
+    for (const action of actions.actions) {
+        if (actionMissingBalance(action, i).length > 0) return 'Cannot execute actions due to insufficient balance(s)'
+        ++i
+    }
+    return null
+})
+
+const executeAction = async () => {
+    let id = -1
+    loading.value = true
+    try {
+        const data = await actions.executeActions()
+        id = app.addToast('Executing actions...', 'alert-info', 0)
+        await data?.wait()
+    } catch (error) {  
+        app.addToast('Error executing actions', 'alert-error', 5000)      
+        console.log(error)
+    } finally {
+        app.removeToast(id)
+        loading.value = false
+    }  
+}
+
+const approve = async () => {
+    let id = -1
+    loading.value = true
+    try {
+        const nextToken = actions.nextToken
+        if (nextToken) {
+            const data = await actions.approveNextToken()
+            id = app.addToast('Approving token...', 'alert-info', 0)
+            await data?.wait()
+            core.setTokenAllowance(nextToken.address, BigInt(MaxUint256))
+        }
+    } catch (error) {  
+        app.addToast('Error approving token', 'alert-error', 5000)      
+        console.log(error)
+    } finally {
+        app.removeToast(id)
+        loading.value = false
+    }  
+}
+
 const formatWarning = (missingBalances: BalanceChange[]) => {
     // N.B. \r\n doesn't work in tooltips
     let text = ''
@@ -87,10 +137,10 @@ const formatWarning = (missingBalances: BalanceChange[]) => {
                             </button>
                         </h2>
                         <div v-for="(balanceChange, j) in action.balanceChanges" :key="j" class="flex justify-between">
-                            <span class="text-xs">{{ balanceChange.symbol }}</span>
+                            <span class="text-xs">{{ balanceChange.symbol }} {{ balanceChange.location === Location.wallet ? '(wallet)' : '' }}</span>
                             <span class="text-xs" :class="{'text-red-500': balanceChange.amount < 0, 'text-green-500': balanceChange.amount > 0}">{{ standardiseDecimals(balanceChange.amount, balanceChange.decimals).toString().indexOf('.') > -1 ? standardiseDecimals(balanceChange.amount, balanceChange.decimals).toFixed(3) : standardiseDecimals(balanceChange.amount, balanceChange.decimals) }}</span>
                         </div>
-                        <div v-if="!loading && actionMissingBalance(action, i).length > 0" class="tooltip flex justify-between" :data-tip="formatWarning(actionMissingBalance(action, i))">
+                        <div v-if="actionMissingBalance(action, i).length > 0" class="tooltip flex justify-between" :data-tip="formatWarning(actionMissingBalance(action, i))">
                             <span></span>
                             <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
                         </div>
@@ -98,8 +148,9 @@ const formatWarning = (missingBalances: BalanceChange[]) => {
                 </div>
             </div>
         </div>
-        <div v-if="loading" class="my-4">
-            <span class="text-xs">Calculating... <span class="loading loading-spinner"></span></span>
+        <div v-if="!error" class="my-4">
+            <button v-if="actions.needsApproval" type="button" class="btn btn-primary" :disabled="loading" @click="approve()">Approve <span v-if="loading" class="loading loading-spinner"></span></button>
+            <button v-if="!actions.needsApproval" type="button" class="btn btn-primary" :disabled="loading" @click="executeAction()">Execute Actions <span v-if="loading" class="loading loading-spinner"></span></button>
         </div>
     </div>
 </template>

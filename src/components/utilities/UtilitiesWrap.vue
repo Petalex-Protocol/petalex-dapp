@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useCoreStore } from '../../store/core'
 import { ActionType, Location, useActionStore } from '../../store/action'
 import { convertFromDecimals, standardiseDecimals } from '../../utils/bn';
+import { AbiCoder } from 'ethers';
 
 const core = useCoreStore()
 const actionStore = useActionStore()
@@ -27,7 +28,8 @@ const addAction = async () => {
             type: ActionType.Wrap,
             displayName: 'Wrap',
             // amount
-            calldata: [convertFromDecimals(amount.value, ethToken.value.decimals)],
+            calldata: AbiCoder.defaultAbiCoder().encode(['uint256'], [convertFromDecimals(amount.value, ethToken.value.decimals)]),
+            data: [convertFromDecimals(amount.value, ethToken.value.decimals)],
             balanceChanges: [{
                 symbol: ethToken.value?.symbol,
                 address: ethToken.value.address,

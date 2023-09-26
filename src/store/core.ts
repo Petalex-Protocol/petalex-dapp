@@ -21,11 +21,14 @@ export enum Network {
 export enum Address {
     petalexNft = "petalexNft",
     actionExecutor = "actionExecutor",
+    flashLoanAction = "flashLoanAction",
+
     gravitaAdmin = "gravitaAdmin",
     gravitaVesselManagerOperations = "gravitaVesselManagerOperations",
     gravitaSortedVessels = "gravitaSortedVessels",
     gravitaDebtToken = "gravitaDebtToken",
     gravitaVesselManager = "gravitaVesselManager",
+
     uniswapV3Factory = "uniswapV3Factory",
     uniswapQuoterV2 = "uniswapQuoterV2",
 
@@ -69,6 +72,7 @@ export interface Token {
     name: string
     symbol: string
     decimals: number
+    allowance: bigint
     price: string
     balanceOf: string
     balanceOfProxy: string
@@ -89,6 +93,10 @@ export const useCoreStore = defineStore({
                         {
                             name: Address.actionExecutor,
                             address: "0x0bd0C23B9AAdb4af399F812B18Ff5619f7507Cfa",
+                        },
+                        {
+                            name: Address.flashLoanAction,
+                            address: "0xaa0c87179c2d3eD9258d6B1bF0a1a4CB7E455099",
                         },
                         {
                             name: Address.gravitaAdmin,
@@ -295,7 +303,8 @@ export const useCoreStore = defineStore({
                     ['symbol', []],
                     ['decimals', []],
                     ['balanceOf', [account.address]],
-                    ['balanceOf', [this.selectedProxyAddress]]
+                    ['balanceOf', [this.selectedProxyAddress]],
+                    ['allowance', [account.address, this.selectedProxyAddress]],
                 ]
                 promises.push(multicall({
                     calls: [
@@ -333,6 +342,7 @@ export const useCoreStore = defineStore({
                         price: defillamaCoinResult.coins[`${defillamaNetwork}:${a}`]?.price?.toString() || '0',
                         balanceOf: (result[i + 3] as any).result,
                         balanceOfProxy: (result[i + 4] as any).result,
+                        allowance: (result[i + 5] as any).result,
                     })
                     i += increment
                 }
@@ -531,6 +541,12 @@ export const useCoreStore = defineStore({
             this.selectedToken = -1
             this.ownedTokens = []
             this.availableTokens = []            
+        },
+        setTokenAllowance(token: string, amount: bigint) {
+            const availableToken = this.availableTokens.find(x => x.address === token)
+            if (availableToken) {
+                availableToken.allowance = amount
+            }
         },
     },
 })

@@ -1,16 +1,17 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { Token, useCoreStore } from '../../store/core'
+import { NATIVE_ADDRESS, Token, useCoreStore } from '../../store/core'
 import { ActionType, Location, useActionStore } from '../../store/action'
 import { convertFromDecimals, standardiseDecimals } from '../../utils/bn';
 import { account } from '@kolirt/vue-web3-auth';
+import { AbiCoder } from 'ethers';
 
 const core = useCoreStore()
 const actionStore = useActionStore()
 
 const loading = ref(false)
 const amount = ref(0)
-const token = ref<Token>({ address: '', name: '', symbol: '', decimals: 18, price: '0', balanceOf: '0', balanceOfProxy: '0' })
+const token = ref<Token>({ address: '', name: '', symbol: '', decimals: 18, price: '0', balanceOf: '0', balanceOfProxy: '0', allowance: BigInt(0) })
 const tokens = computed(() => core.availableTokens)
 
 const error = computed(() => {
@@ -28,7 +29,9 @@ const addAction = async () => {
             type: ActionType.Pull,
             displayName: 'Pull',
             // token, from address, amount
-            calldata: [token.value.address, account.address, convertFromDecimals(amount.value, token.value.decimals)],
+            calldata: AbiCoder.defaultAbiCoder().encode(['address', 'address', 'uint256'], [token.value.address, account.address, convertFromDecimals(amount.value, token.value.decimals)]),
+            data: [token.value.address, account.address, convertFromDecimals(amount.value, token.value.decimals)],
+            value: NATIVE_ADDRESS === token.value.address ? convertFromDecimals(amount.value, token.value.decimals) : BigInt(0),
             balanceChanges: [{
                 symbol: token.value?.symbol,
                 address: token.value.address,

@@ -39,7 +39,7 @@ onMounted(init)
 </script>
 
 <template>
-    <div v-for="toast in toasts" :key="toast.id" class="toast toast-top toast-end" >
+    <div v-for="toast in toasts" :key="toast.id" class="toast toast-top toast-end z-50">
         <div class="alert" :class="toast.class">
             <span>{{ toast.text }}</span>
         </div>

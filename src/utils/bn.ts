@@ -26,5 +26,5 @@ export const convertFromDecimals = (amount: string | number | undefined, decimal
     if (decimalPlaces <= 0) {
         return BigInt(amountNumber) * (BigInt(10) ** BigInt(decimals))
     }
-    return (BigInt(Math.floor(amountNumber * (10 ** decimalPlaces))) * (BigInt(10) ** BigInt(decimals))) / BigInt(10 ** decimalPlaces)
+    return BigInt(Math.round(amountNumber * (10 ** decimalPlaces))) * (BigInt(10) ** BigInt(Number(decimals) - decimalPlaces))
 }

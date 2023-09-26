@@ -1,4 +1,9 @@
 import { defineStore } from "pinia"
+import { Address, NATIVE_ADDRESS, useCoreStore } from "./core"
+import { account, writeContract } from '@kolirt/vue-web3-auth'
+import actionExecutorAbi from '../abi/petalex/actionexecutor.json'
+import erc20Abi from '../abi/petalex/erc20.json'
+import { MaxUint256, AbiCoder } from "ethers"
 
 export enum Location {
     proxy,
@@ -32,11 +37,11 @@ export interface BalanceChange {
 export interface Action {
     type: ActionType
     displayName: string
-    calldata: any[]
+    calldata: string
     value?: bigint
     balanceChanges: BalanceChange[],
     removeAction?: () => void,
-    data?: any[],
+    data: any[],
 }
 
 export interface ActionState {
@@ -73,6 +78,39 @@ export const useActionStore = defineStore({
         getActions(state: ActionState) {
             return state.actions
         },
+        needsApproval(state: ActionState) {
+            const core = useCoreStore()
+            if (!account.connected || core.selectedToken === -1) {
+                return false
+            }
+
+            const pullActions = state.actions.filter(x => x.type === ActionType.Pull && x.data[0] !== NATIVE_ADDRESS).map(x => ({ address: x.data[0], amount: x.data[1] as bigint }))
+            const tokens = core.availableTokens.filter(x => pullActions.some(y => y.address === x.address && x.allowance < y.amount))
+
+            if (tokens.length === 0) {
+                return false
+            }
+            return true
+        },
+        nextToken(state: ActionState) {
+            const core = useCoreStore()
+            if (!account.connected || core.selectedToken === -1) {
+                return null
+            }
+
+            const pullActions = state.actions.filter(x => x.type === ActionType.Pull && x.data[0] !== NATIVE_ADDRESS).map(x => ({ address: x.data[0], amount: x.data[1] as bigint }))
+            const tokens = core.availableTokens.filter(x => pullActions.some(y => y.address === x.address && x.allowance < y.amount))
+
+            if (tokens.length === 0) {
+                return null
+            }
+            return tokens[0]
+        },
+        canExecute(state: ActionState) {
+            let actions = [...state.actions]
+            actions = actions.filter(x => !((x.type === ActionType.Pull && x.data[0] === NATIVE_ADDRESS) || x.type === ActionType.FlashReturn)) // native tokens get send in value param
+            return actions.length > 0
+        },
     },
     actions: {
         spliceAction(action: Action, index: number) {
@@ -98,6 +136,80 @@ export const useActionStore = defineStore({
             if (removeAction) {
                 (removeAction as () => void)()
             }
+        },
+        async executeActions() {
+            const core = useCoreStore()
+            const actionExecutor = core.getAddress(Address.actionExecutor)
+            const flashLoanAddress = core.getAddress(Address.flashLoanAction)
+            if (!actionExecutor || !flashLoanAddress || !account.connected || core.selectedToken === -1) {
+                return
+            }
+
+            const value = this.actions.filter(x => x.value).reduce((a, b) => a + b.value!, BigInt(0))
+
+            // HANDLE SPECIAL CASES
+            
+            // copy this.actions so we can manipulate it without changing original state
+            let actions = [...this.actions]
+            actions = actions.filter(x => !((x.type === ActionType.Pull && x.data[0] === NATIVE_ADDRESS) || x.type === ActionType.FlashReturn)) // native tokens get send in value param
+
+            // flash return action needs to be changed to a send action that sends the flashed amount + fee to the flash action address
+            // if we flashed both tokens, we need to send both tokens + fee
+            const flashReturn = this.actions.find(x => x.type === ActionType.FlashReturn)
+            if (flashReturn && flashReturn.data) {
+                if (flashReturn.data[1] as bigint > BigInt(0)) {
+                    actions.push({
+                        type: ActionType.Send,
+                        displayName: 'Send',
+                        // token, to address, amount
+                        calldata: AbiCoder.defaultAbiCoder().encode(['address', 'address', 'uint256'], [flashReturn.data[3], flashLoanAddress, flashReturn.data[1]]),
+                        data: [],
+                        balanceChanges: [],
+                    } as Action)
+                }
+                if (flashReturn.data[2] as bigint > BigInt(0)) {
+                    actions.push({
+                        type: ActionType.Send,
+                        displayName: 'Send',
+                        // token, to address, amount
+                        calldata: AbiCoder.defaultAbiCoder().encode(['address', 'address', 'uint256'], [flashReturn.data[4], flashLoanAddress, flashReturn.data[2]]),
+                        data: [],
+                        balanceChanges: [],
+                    } as Action)
+                }
+            }
+
+            // END HANDLE SPECIAL CASES
+
+            return await writeContract({
+                address: actionExecutor as `0x${string}`,
+                abi: actionExecutorAbi,
+                functionName: 'executeActionList',
+                args: [{ callData: actions.map(x => x.calldata), actionIds: actions.map(x => this.actionMap[x.type]), tokenId: core.selectedToken }],
+                value,
+            })
+        },
+        async approveNextToken() {
+            const core = useCoreStore()
+            if (!account.connected || core.selectedToken === -1) {
+                return
+            }
+
+            const pullActions = this.actions.filter(x => x.type === ActionType.Pull && x.data[0] !== NATIVE_ADDRESS).map(x => ({ address: x.data[0], amount: x.data[1] as bigint }))
+            const tokens = core.availableTokens.filter(x => pullActions.some(y => y.address === x.address && x.allowance < y.amount))
+
+            if (tokens.length === 0) {
+                return
+            }
+
+            const nextToken = tokens[0]
+
+            return await writeContract({
+                address: nextToken.address as `0x${string}`,
+                abi: erc20Abi,
+                functionName: 'approve',
+                args: [core.selectedProxyAddress, MaxUint256],
+            })
         },
         disconnect() {
             this.actions = []

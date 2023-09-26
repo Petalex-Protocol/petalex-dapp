@@ -4,13 +4,14 @@ import { useCoreStore, Token, NATIVE_ADDRESS } from '../../store/core'
 import { ActionType, Location, useActionStore } from '../../store/action'
 import { convertFromDecimals, standardiseDecimals } from '../../utils/bn'
 import { useDebounceFn } from '@vueuse/core'
+import { AbiCoder } from 'ethers'
 
 const core = useCoreStore()
 const actionStore = useActionStore()
 
 const loading = ref(false)
-const token0 = ref<Token>({ address: '', name: '', symbol: '', decimals: 18, price: '0', balanceOf: '0', balanceOfProxy: '0' })
-const token1 = ref<Token>({ address: '', name: '', symbol: '', decimals: 18, price: '0', balanceOf: '0', balanceOfProxy: '0' })
+const token0 = ref<Token>({ address: '', name: '', symbol: '', decimals: 18, price: '0', balanceOf: '0', balanceOfProxy: '0', allowance: BigInt(0) })
+const token1 = ref<Token>({ address: '', name: '', symbol: '', decimals: 18, price: '0', balanceOf: '0', balanceOfProxy: '0', allowance: BigInt(0) })
 const intermediateTokens = ref<Token[]>([])
 const amount0 = ref(0)
 const amount1 = ref(0)
@@ -68,7 +69,8 @@ const addAction = async () => {
             type: ActionType.UniswapV3ExactInput,
             displayName: 'Exchange',
             // token, amount, amoutnOutMin, path
-            calldata: [token0.value.address, convertFromDecimals(amount0.value, token0.value.decimals), convertFromDecimals(amount1.value * ((100 - slippage.value) / 100), token1.value.decimals), chosenPathCallData.value],
+            data: [token0.value.address, convertFromDecimals(amount0.value, token0.value.decimals), convertFromDecimals(amount1.value * ((100 - slippage.value) / 100), token1.value.decimals), chosenPathCallData.value],
+            calldata: AbiCoder.defaultAbiCoder().encode(['address', 'uint256', 'uint256', 'bytes'], [token0.value.address, convertFromDecimals(amount0.value, token0.value.decimals), convertFromDecimals(amount1.value * ((100 - slippage.value) / 100), token1.value.decimals), chosenPathCallData.value]),
             balanceChanges: [{
                 symbol: token0.value.symbol,
                 address: token0.value.address,
@@ -89,7 +91,7 @@ const addAction = async () => {
 }
 
 const addHop = () => {
-    intermediateTokens.value.push({ address: '', name: '', symbol: '', decimals: 18, price: '0', balanceOf: '0', balanceOfProxy: '0' })
+    intermediateTokens.value.push({ address: '', name: '', symbol: '', decimals: 18, price: '0', balanceOf: '0', balanceOfProxy: '0', allowance: BigInt(0) })
 }
 </script>
 

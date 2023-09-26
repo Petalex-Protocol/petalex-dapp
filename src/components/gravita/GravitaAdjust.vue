@@ -5,6 +5,7 @@ import { ActionType, Location, useActionStore } from '../../store/action'
 import { standardiseDecimals, convertFromDecimals } from '../../utils/bn'
 import { watchPausable } from '@vueuse/core'
 import { useGravitaStore, GravitaCollateralInfo } from '../../store/gravita'
+import { AbiCoder } from 'ethers'
 
 const core = useCoreStore()
 const actionStore = useActionStore()
@@ -108,7 +109,7 @@ const addAction = async () => {
             type: ActionType.GravitaAdjust,
             displayName: 'Adjust Vessel',
             // collateral, collDeposit, collWithdraw, debtChange, isDebtIncrease, upperHint, lowerHint
-            calldata: [selectedCollateral.value.address, collDeposit, collWithdraw, debtChange, debtDelta.value > 0, upperHint, lowerHint],
+            calldata: AbiCoder.defaultAbiCoder().encode(['address', 'uint256', 'uint256', 'uint256', 'bool', 'address', 'address'], [selectedCollateral.value.address, collDeposit, collWithdraw, debtChange, debtDelta.value > 0, upperHint, lowerHint]),
             balanceChanges: [{
                 symbol: selectedCollateral.value.symbol,
                 address: selectedCollateral.value.address,

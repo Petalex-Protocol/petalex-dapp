@@ -5,6 +5,7 @@ import { ActionType, Location, useActionStore } from '../../store/action'
 import { standardiseDecimals, convertFromDecimals } from '../../utils/bn'
 import { watchPausable } from '@vueuse/core'
 import { useGravitaStore, GravitaCollateralInfo } from '../../store/gravita'
+import { AbiCoder } from 'ethers'
 
 const core = useCoreStore()
 const actionStore = useActionStore()
@@ -83,7 +84,7 @@ const addAction = async () => {
         actionStore.spliceAction({
             type: ActionType.GravitaOpen,
             displayName: 'Open Vessel',
-            calldata: [selectedCollateral.value.address, coll, debt, upperHint, lowerHint],
+            calldata: AbiCoder.defaultAbiCoder().encode(['address', 'uint256', 'uint256', 'address', 'address'], [selectedCollateral.value.address, coll, debt, upperHint, lowerHint]),
             balanceChanges: [{
                 symbol: selectedCollateral.value.symbol,
                 address: selectedCollateral.value.address,

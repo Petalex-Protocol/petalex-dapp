@@ -46,7 +46,7 @@ export const useGravitaStore = defineStore({
             const openedVessels = actionStore.actions?.filter(x => x.type === ActionType.GravitaOpen) || []
             return [
                 ...openedVessels.map(x => ({
-                    address: x.calldata[0],
+                    address: x.data[0],
                     hasVessel: true
                 })),
                 ...state.gravitaCollateralInfo.map(x => ({ address: x.address, hasVessel: x.vesselStatus === 1 }))
@@ -127,6 +127,7 @@ export const useGravitaStore = defineStore({
                     vesselStatus: 0,
                     vesselCollateral: '0',
                     vesselDebt: '0',
+                    allowance: BigInt(0),
                 })
                 collateralCalls.push({
                     abi: erc20ABI,
@@ -136,7 +137,8 @@ export const useGravitaStore = defineStore({
                         ['symbol', []],
                         ['decimals', []],
                         ['balanceOf', [account.address]],
-                        ['balanceOf', [core.selectedProxyAddress]]
+                        ['balanceOf', [core.selectedProxyAddress]],
+                        ['allowance', [account.address, core.selectedProxyAddress]],
                     ],
                 })
                 priceFeedCalls.push({
@@ -175,7 +177,7 @@ export const useGravitaStore = defineStore({
             let j = 1
             let k = 0
             let adminMod = 6 // number of admin contract calls
-            let ercMod = 5 // number of erc20 calls
+            let ercMod = 6 // number of erc20 calls
             let priceFeedMod = 1 // number of price feed calls
             let vesselManagerMod = 3 // number of vessel manager calls
             let adminCalls = true
@@ -229,6 +231,9 @@ export const useGravitaStore = defineStore({
                                 break
                             case 5:
                                 info.balanceOfProxy = data.result.toString()
+                                break
+                            case 6:
+                                info.allowance = data.result
                                 break
                         }
                     } else {
@@ -425,7 +430,7 @@ export const useGravitaStore = defineStore({
 
             const closedVessels = actionStore.actions?.filter(x => x.type === ActionType.GravitaClose) || []
             for (const vessel of closedVessels) {
-                const collateralAddress = vessel.calldata[0]
+                const collateralAddress = vessel.data[0]
                 this.closeVessel(collateralAddress)
             }
         },
