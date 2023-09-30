@@ -137,10 +137,10 @@ const formatWarning = (missingBalances: BalanceChange[]) => {
                             </button>
                         </h2>
                         <div v-for="(balanceChange, j) in action.balanceChanges" :key="j" class="flex justify-between">
-                            <span class="text-xs">{{ balanceChange.symbol }} {{ balanceChange.location === Location.wallet ? '(wallet)' : '' }}</span>
+                            <span class="text-xs text-white">{{ balanceChange.symbol }} {{ balanceChange.location === Location.wallet ? '(wallet)' : '' }}</span>
                             <span class="text-xs" :class="{'text-red-500': balanceChange.amount < 0, 'text-green-500': balanceChange.amount > 0}">{{ standardiseDecimals(balanceChange.amount, balanceChange.decimals).toString().indexOf('.') > -1 ? standardiseDecimals(balanceChange.amount, balanceChange.decimals).toFixed(3) : standardiseDecimals(balanceChange.amount, balanceChange.decimals) }}</span>
                         </div>
-                        <div v-if="actionMissingBalance(action, i).length > 0" class="tooltip flex justify-between" :data-tip="formatWarning(actionMissingBalance(action, i))">
+                        <div v-if="actionMissingBalance(action, i).length > 0" class="tooltip flex justify-between text-white" :data-tip="formatWarning(actionMissingBalance(action, i))">
                             <span></span>
                             <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
                         </div>

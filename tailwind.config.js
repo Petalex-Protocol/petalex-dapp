@@ -52,6 +52,9 @@ export default {
         ".navbar": {
           color: "#fff",
         },
+        ".menu li a:hover": {
+          color: "#fff",
+        },
       },
       dark: {
         ...require("daisyui/src/theming/themes")["[data-theme=dark]"],

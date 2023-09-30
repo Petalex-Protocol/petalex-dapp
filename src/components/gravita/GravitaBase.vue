@@ -71,7 +71,7 @@ onMounted(init)
                 </tbody>
             </table>
         </div>
-        <RouterView class="my-4" />
+        <RouterView class="my-10" />
     </div>
     <div v-else>
         <NetworkUnsupported />

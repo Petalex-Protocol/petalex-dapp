@@ -55,7 +55,7 @@ const addAction = async () => {
     <div class="card w-[500px] bg-base-200 shadow-xl mx-auto">
         <div class="card-body">
             <h2 class="card-title">Transfer from Proxy</h2>
-            <p class="text">Send funds from your proxy wallet to your address</p>
+            <p class="text-white">Send funds from your proxy wallet to your address</p>
             <div class="join">
                 <input class="input input-bordered join-item w-full" v-model="amount" />
                 <select class="select select-bordered join-item" v-model="token">
