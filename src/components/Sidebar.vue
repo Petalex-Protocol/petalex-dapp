@@ -41,8 +41,8 @@ onMounted(init)
                 <RouterView class="p-4" />
                 <ActionsBase />
             </div>
-            <div v-else class="w-full text-center">
-                <span class="loading loading-spinner text-primary loading-md "></span>
+            <div v-else class="w-full text-center p-10">
+                <span class="loading loading-spinner text-primary loading-md"></span>
             </div>
             <label for="my-drawer-2" class="btn btn-circle btn-primary drawer-button xs:hidden fixed top-[50%] left-[-25px]">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
