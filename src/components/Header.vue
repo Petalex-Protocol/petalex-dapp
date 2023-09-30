@@ -32,9 +32,9 @@ const getChainName = (network: string) => {
 </script>
 
 <template>
-    <nav class="navbar bg-base-100">
+    <nav class="navbar bg-base-100 border-solid border-b-2 border-primary">
         <div class="navbar-start">
-            <router-link to="/" class="btn btn-ghost normal-case text-xl">Petalex</router-link>
+            <router-link to="/" class="btn btn-ghost btn-circle ml-4"><img width="46" src="/src/assets/petalex_favicon.png"></router-link>
         </div>
         <div class="navbar-end">
             <button class="btn btn-ghost btn-circle" v-if="isDark" @click="onThemeToggle('light')">

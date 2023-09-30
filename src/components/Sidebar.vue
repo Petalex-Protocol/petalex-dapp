@@ -37,7 +37,7 @@ onMounted(init)
     <div class="drawer md:drawer-open">
         <input id="my-drawer-2" type="checkbox" class="drawer-toggle" />
         <div class="drawer-content">
-            <div v-if="!loading" class="flex flex-col justify-between h-full">
+            <div v-if="!loading" class="flex flex-col justify-between h-full p-10">
                 <RouterView class="p-4" />
                 <ActionsBase />
             </div>
@@ -52,7 +52,7 @@ onMounted(init)
         </div> 
         <div class="drawer-side">
             <label for="my-drawer-2" class="drawer-overlay"></label> 
-            <ul class="menu p-4 w-[250px] h-full bg-base-200 text-base-content"> 
+            <ul class="menu p-4 w-[250px] h-full bg-base-100 border-solid border-e-2 border-primary"> 
                 <li class="collapse">
                     <input type="radio" name="my-accordion-1" /> 
                     <div class="collapse-title">

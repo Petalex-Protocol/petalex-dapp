@@ -32,7 +32,7 @@ const select = async (tokenId: number) => {
                 <div v-for="t in ownedTokens">
                     <div class="flex flex-row items-center">
                         <div class="flex flex-col">
-                            <div class="text-lg font-bold">Token {{ t }}</div>
+                            <div class="text-lg font-bold text-white">Token {{ t }}</div>
                         </div>
                         <div class="flex-grow"></div>
                         <div class="flex flex-col">
