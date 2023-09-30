@@ -45,10 +45,12 @@ onMounted(init)
         </div>
     </div>
     <div v-if="petalexAddress && account.connected">
+        
         <RouterView />
     </div>
     <div v-else-if="!account.connected">
         <div class="text-center">
+            <img src="/src/assets/petalex-plant.png" width="500" class="mx-auto" />
             <h2 class="text-2xl font-bold">Welcome to Petalex!</h2>
             <p class="text-lg">Connect your wallet below</p>
         </div>

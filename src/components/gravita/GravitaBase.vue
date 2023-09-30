@@ -6,12 +6,14 @@ import { chain, account } from '@kolirt/vue-web3-auth'
 import { standardiseDecimals } from '../../utils/bn'
 import { useGravitaStore } from '../../store/gravita'
 import { useRoute, useRouter } from 'vue-router'
+import { useAppStore } from '../../store/app'
 
 const core = useCoreStore()
 const gravita = useGravitaStore()
 const adminAddress = computed(() => core.getAddress(Address.gravitaAdmin))
 const route = useRoute()
 const router = useRouter()
+const appStore = useAppStore()
 
 const activeCollaterals = computed(() => gravita.gravitaCollateralInfo?.filter(x => x.isActive) || [])
 const loading = ref(false)
@@ -34,6 +36,10 @@ const init = async () => {
     }
 }
 
+const image = computed(() => {
+    return appStore.theme === 'light' ? '/src/assets/gravita_dark.png' : '/src/assets/gravita_light.png'
+})
+
 watch([chain, account], init)
 
 onMounted(init)
@@ -41,6 +47,7 @@ onMounted(init)
 
 <template>
     <div v-if="adminAddress">
+        <img :src="image" width="500" class="mx-auto mb-10" />
         <div class="overflow-x-auto">
             <table class="table">
                 <thead>

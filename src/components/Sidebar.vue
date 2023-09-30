@@ -56,7 +56,7 @@ onMounted(init)
                 <li class="collapse">
                     <input type="radio" name="my-accordion-1" /> 
                     <div class="collapse-title">
-                        Petalex
+                        <img width="30" src="/src/assets/petalex_favicon.png"> Petalex
                     </div>
                     <ul class="collapse-content"> 
                         <li><router-link to="/mint">Mint</router-link></li>
@@ -66,7 +66,7 @@ onMounted(init)
                 <li v-if="core.selectedProxyAddress" class="collapse">
                     <input type="radio" name="my-accordion-1" /> 
                     <div class="collapse-title">
-                        Gravita
+                        <img src="/src/assets/gravita_logo.png" width="30" /> Gravita 
                     </div>
                     <ul class="collapse-content"> 
                         <li><router-link to="/gravita/open">Open</router-link></li>
@@ -77,7 +77,7 @@ onMounted(init)
                 <li v-if="core.selectedProxyAddress" class="collapse">
                     <input type="radio" name="my-accordion-1" /> 
                     <div class="collapse-title">
-                        Liquity
+                        <img src="/src/assets/liquity.png" width="30" /> Liquity
                     </div>
                     <ul class="collapse-content"> 
                         <li><router-link to="/liquity/open">Open</router-link></li>

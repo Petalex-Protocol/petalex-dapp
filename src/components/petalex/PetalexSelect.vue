@@ -19,6 +19,7 @@ const select = async (tokenId: number) => {
 
 <template>
     <div>
+        <img src="/src/assets/petalex-plant.png" width="500" class="mx-auto" />
         <div class="text-center">
             <h2 class="text-2xl font-bold">Select NFT!</h2>
             <p class="text-lg">Select the NFT you wish to act as your proxy wallet</p>

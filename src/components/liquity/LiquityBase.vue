@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { onMounted, computed, ref, watch } from 'vue'
 import { useCoreStore } from '../../store/core'
 import { chain, account } from '@kolirt/vue-web3-auth'
 import { useRoute, useRouter } from 'vue-router'
-import ComingSoon from '../common/ComingSoon.vue';
+import ComingSoon from '../common/ComingSoon.vue'
+import { useAppStore } from '../../store/app'
 
 const core = useCoreStore()
 const route = useRoute()
 const router = useRouter()
+const appStore = useAppStore()
 
 const loading = ref(false)
 
@@ -28,12 +30,17 @@ const init = async () => {
     }
 }
 
+const image = computed(() => {
+    return appStore.theme === 'light' ? '/src/assets/liquity_dark.png' : '/src/assets/liquity_light.png'
+})
+
 watch([chain, account], init)
 
 onMounted(init)
 </script>
 
 <template>
+    <img :src="image" width="500" class="mx-auto mb-10" />
     <ComingSoon />
     <RouterView />
 </template>

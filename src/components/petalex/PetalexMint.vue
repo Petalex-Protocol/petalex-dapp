@@ -46,6 +46,7 @@ const error = computed(() => {
 
 <template>
     <div>
+        <img src="/src/assets/petalex-plant.png" width="500" class="mx-auto" />
         <div class="text-center">
             <h2 class="text-2xl font-bold">Welcome to Petalex!</h2>
             <p class="text-lg">Mint your proxy wallets below</p>
