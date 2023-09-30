@@ -51,7 +51,7 @@ const getChainName = (network: string) => {
                 <div class="dropdown align-top">
                     <button tabindex="0" class="btn btn-circle btn-ghost"><img :src="currentIcon" :alt="coreStore.connectedNetwork" class="small-chain-icon" /></button>
                     <div tabindex="0" class="shadow dropdown-content bg-base-200 z-20">
-                        <div v-for="icon in icons" :key="icon.name" class="flex items-center gap-4 my-4 cursor-pointer outline py-2 px-4 rounded-md outline-primary hover:outline-white" @click="onSwitchChain(icon.name)">
+                        <div v-for="icon in icons" :key="icon.name" class="flex items-center gap-4 cursor-pointer py-2 px-4 rounded-md border-primary border-2 border-solid hover:border-white" @click="onSwitchChain(icon.name)">
                             <img :src="icon.icon" :alt="icon.name" class="flex-none chain-icon" />
                             <div class="flex">{{ getChainName(icon.name) }}</div>
                         </div>
