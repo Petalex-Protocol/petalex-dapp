@@ -15,9 +15,10 @@ app.use(createWeb3Auth({
     chains: [
         // Chains.goerli,
         // Chains.mainnet,
-        Chains.arbitrum,
+        
         // Chains.optimism,
-        import.meta.env.MODE === 'development' ? {
+        // import.meta.env.MODE === 'development' ? 
+        {
             id: 1,
             name: 'Ethereum Devnet',
             network: Chains.mainnet.network,
@@ -34,7 +35,9 @@ app.use(createWeb3Auth({
             },
             blockExplorers: Chains.mainnet.blockExplorers,
             contracts: Chains.mainnet.contracts,
-        } : Chains.mainnet,
+        },
+        Chains.arbitrum,
+        // : Chains.mainnet,
     ],
     enableCustomProvider: true,
 }))
