@@ -7,6 +7,8 @@ import { standardiseDecimals } from '../../utils/bn'
 import { useGravitaStore } from '../../store/gravita'
 import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '../../store/app'
+import gravitaDark from '@/assets/gravita_dark.png'
+import gravitaLight from '@/assets/gravita_light.png'
 
 const core = useCoreStore()
 const gravita = useGravitaStore()
@@ -37,7 +39,7 @@ const init = async () => {
 }
 
 const image = computed(() => {
-    return appStore.theme === 'light' ? '/src/assets/gravita_dark.png' : '/src/assets/gravita_light.png'
+    return appStore.theme === 'light' ? gravitaDark : gravitaLight
 })
 
 watch([chain, account], init)

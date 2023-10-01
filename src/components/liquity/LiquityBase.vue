@@ -5,6 +5,8 @@ import { chain, account } from '@kolirt/vue-web3-auth'
 import { useRoute, useRouter } from 'vue-router'
 import ComingSoon from '../common/ComingSoon.vue'
 import { useAppStore } from '../../store/app'
+import liquityDark from '@/assets/liquity_dark.png'
+import liquityLight from '@/assets/liquity_light.png'
 
 const core = useCoreStore()
 const route = useRoute()
@@ -31,7 +33,7 @@ const init = async () => {
 }
 
 const image = computed(() => {
-    return appStore.theme === 'light' ? '/src/assets/liquity_dark.png' : '/src/assets/liquity_light.png'
+    return appStore.theme === 'light' ? liquityDark : liquityLight
 })
 
 watch([chain, account], init)
