@@ -88,15 +88,15 @@ export const useCoreStore = defineStore({
                     addresses: [
                         {
                             name: Address.petalexNft,
-                            address: "0xF583a59c59F8dF885e118736E8ED2E7b3e25A671",
+                            address: "0x4f1390815DBc3518459359fd4156907EE8cB60Df",
                         },
                         {
                             name: Address.actionExecutor,
-                            address: "0x0bd0C23B9AAdb4af399F812B18Ff5619f7507Cfa",
+                            address: "0xC9061573b481bc1db58A433E0A359CEBAe1dA8C9",
                         },
                         {
                             name: Address.flashLoanAction,
-                            address: "0xaa0c87179c2d3eD9258d6B1bF0a1a4CB7E455099",
+                            address: "0xAb61A0425a3562E8Df6263cc6C488A650f048010",
                         },
                         {
                             name: Address.gravitaAdmin,
@@ -394,7 +394,7 @@ export const useCoreStore = defineStore({
             // get the best quote for each combination
             const allPaths = []
             for (const f of feeTierCombinations) {
-                const types = f.reduce((p, c) => {
+                const types = f.reduce((p) => {
                     p.push('uint24')
                     p.push('address')
                     return p

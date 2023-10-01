@@ -157,7 +157,7 @@ const formatWarning = (missingBalances: BalanceChange[]) => {
 
 <style scoped>
 .action-bar {
-    max-width: calc(100vw - 286px);
+    max-width: calc(100vw - 366px);
 }
 
 @media (max-width: 768px) {

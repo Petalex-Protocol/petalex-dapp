@@ -11,6 +11,7 @@ const select = async (tokenId: number) => {
     loading.value = true
     try {
         await core.selectToken(tokenId)
+        await core.getGeneralTokenInfo()
     } finally {
         loading.value = false
     }

@@ -23,6 +23,7 @@ const mint = async () => {
         id = app.addToast('Minting NFTs...', 'alert-info', 0)
         await data?.wait()
         await core.getPetalexInfo(account.address?.toString() || '')
+        await core.getGeneralTokenInfo()
         router.push('/select')
     } catch (error) {  
         app.addToast('Error minting NFTs', 'alert-error', 5000)      

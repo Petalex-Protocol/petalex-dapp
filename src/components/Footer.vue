@@ -14,5 +14,12 @@
                 <a class="link link-hover" target="_blank" href="https://github.com/Petalex-Protocol"><img class="icon" width="32px" src="/src/assets/github-mark-white.png" /></a> 
             </div>
         </nav>
+        <nav>
+            <header class="footer-title">Legal</header> 
+            <div class="grid grid-flow-row gap-4">
+                <a class="link link-hover" target="_blank" href="https://www.petalex.eth.limo/docs/disclaimer">Disclaimer</a>
+                <a class="link link-hover" target="_blank" href="https://www.petalex.eth.limo/docs/terms">Terms of Service</a> 
+            </div>
+        </nav>
     </footer>
 </template>

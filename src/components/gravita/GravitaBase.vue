@@ -48,6 +48,15 @@ onMounted(init)
 <template>
     <div v-if="adminAddress">
         <img :src="image" width="500" class="mx-auto mb-10" />
+        <p class="p-4">
+            Gravita Protocol is a decentralised borrowing protocol built on Ethereum that provides users with interest-free loans secured by both Liquid Staking Tokens (LST) and a Stability Pool (SP).
+        </p>
+        <p class="p-4">
+            Loans are issued in the form of minting GRAI, a token with similar volatility dampening mechanism as LUSD, and can be up to 90% of the value of a user's collateral (99% in the case of bLUSD). 
+        </p>
+        <p class="mb-4 p-4">
+            For more information, please visit <a href="https://docs.gravitaprotocol.com" target="_blank" class="link">docs.gravitaprotocol.com</a>
+        </p>
         <div class="overflow-x-auto">
             <table class="table">
                 <thead>

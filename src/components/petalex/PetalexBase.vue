@@ -21,7 +21,7 @@ const init = async () => {
         try {
             if (account.connected) {
                 loading.value = true
-                if (route.meta.requiresMint && core.ownedTokens.length === 0) {
+                if ((route.meta.requiresMint && core.ownedTokens.length === 0) || route.path === '/') {
                     router.push('/mint')
                 }
             }
@@ -44,8 +44,7 @@ onMounted(init)
             <span>{{ toast.text }}</span>
         </div>
     </div>
-    <div v-if="petalexAddress && account.connected">
-        
+    <div v-if="petalexAddress && account.connected">        
         <RouterView />
     </div>
     <div v-else-if="!account.connected">
